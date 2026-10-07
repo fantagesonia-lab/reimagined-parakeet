@@ -6,14 +6,21 @@ const ctx = { console: { log() {}, warn: (...a) => errors.push(a.join(' ')) } },
 vm.createContext(ctx);
 const files = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/manifest.json'), 'utf8')).filter(f => !/ui\.js|scenes\.js/.test(f));
 let ok = true;
+const onlyCat = process.argv[2];
 for (const f of files) {
   try { vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', f), 'utf8'), ctx, { filename: f }); }
-  catch (e) { console.log(`FAIL load ${f}: ${e.message}`); ok = false; }
+  catch (e) {
+    // with a category argument, other categories' files (possibly mid-edit by someone else) only warn
+    const mine = !onlyCat || !f.startsWith('items/') || f === `items/${onlyCat}.js` || f.startsWith('items/_');
+    console.log(`${mine ? 'FAIL' : 'warn'} load ${f}: ${e.message}`); if (mine) ok = false;
+  }
 }
 vm.runInContext('this.API={renderCharacter,ITEMS,ITEM_BY_ID};', ctx);
-const { renderCharacter, ITEMS } = ctx.API, only = process.argv[2];
+const { renderCharacter, ITEMS } = ctx.API, only = onlyCat;
 const seen = {};
 for (const it of ITEMS) { if (seen[it.id]) { console.log(`FAIL duplicate id "${it.id}" (${seen[it.id]} and ${it.cat})`); ok = false; } seen[it.id] = it.cat; }
+const REQUIRED = ['messy','spiky','long','pony','wolf','hime','curls','twintail','buns','puff','maple','armor','tunic','hoodie','sweater','tee','shorts','joggers','cargo','maxi','overalls','witch','pirate','gown','magical','sneakers','knight','mary','boots','stockings','bunnyslip','rain','viking','witchhat','flowers','bandana','tricorn','crown','bow','phones','mushroom','cape','quiver','fairywings','roundglass','ninja','patch','sword','staff','huntbow','dagger','cutlass','bouquet','wand','plush','leafshield'];
+for (const id of REQUIRED) if (!seen[id]) { const cat = id; console.log(`${onlyCat ? 'warn' : 'FAIL'} missing id used by presets: ${id}`); if (!onlyCat) ok = false; }
 const views = ['front', 'side', 'back'], colors = [undefined, '#f7f3f8', '#2b2633', '#e0475a', '#5bb36a'];
 let worst = { ms: 0 };
 for (const it of ITEMS.filter(i => !only || i.cat === only)) {
