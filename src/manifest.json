@@ -1,0 +1,17 @@
+[
+ "sprites.js",
+ "engine.js",
+ "items/_shared.js",
+ "items/top.js",
+ "items/bottom.js",
+ "items/dress.js",
+ "items/shoes.js",
+ "items/hair.js",
+ "items/hat.js",
+ "items/face.js",
+ "items/back.js",
+ "items/hand.js",
+ "items/_end.js",
+ "scenes.js",
+ "ui.js"
+]

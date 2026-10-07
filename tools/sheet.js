@@ -1,23 +1,39 @@
-// Dev helper: render every item in every view into a PNG contact sheet.
-// usage: node tools/sheet.js out.png [category]
+// Dev helper: render items in every view into a PNG contact sheet.
+//   node tools/sheet.js out.png <filter> [--color=#hex] [--views=front,side,back] [--base=hair:bob,top:tee,...]
+//   <filter>: comma list of categories and/or item ids (e.g. "hair" or "tee,armor,hat")
+//   env S=scale (default 2), N=items per row (default 4), BG=#hex background
+// Files are loaded one at a time; a file with a syntax error is skipped with a warning,
+// and a failing item draw is caught, so one broken file never blocks another category.
 const fs = require('fs'), zlib = require('zlib'), vm = require('vm'), path = require('path');
-const src = ['sprites.js', 'engine.js', 'items.js'].map(f => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8')).join('\n');
-const ctx = {}; vm.createContext(ctx); vm.runInContext(src + '\nthis.API={renderCharacter,ITEMS,CW,CH};', ctx);
+const args = process.argv.slice(2), flags = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => a.slice(2).split('=')));
+const [outFile, filter] = args.filter(a => !a.startsWith('--'));
+const ctx = { console }; vm.createContext(ctx);
+const files = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/manifest.json'), 'utf8')).filter(f => !/ui\.js|scenes\.js/.test(f));
+for (const f of files) {
+  const code = fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
+  try { vm.runInContext(code, ctx, { filename: f }); } catch (e) { console.warn(`! skipped ${f}: ${e.message}`); }
+}
+vm.runInContext('this.API={renderCharacter,ITEMS,CW,CH};', ctx);
 const { renderCharacter, ITEMS, CW, CH } = ctx.API;
-const cat = process.argv[3];
-const base = { skin: 0, eyes: 0, equip: { hair: { id: 'bob', color: '#7a4a2e' }, top: { id: 'tee' }, bottom: { id: 'jeans' }, shoes: { id: 'sneakers' } } };
-const list = ITEMS.filter(i => !cat || cat.split(',').includes(i.cat) || cat.split(',').includes(i.id));
-const views = ['front', 'side', 'back'];
-const S = +(process.env.S || 2), cols = views.length * Math.min(+(process.env.N||4), list.length), rows = Math.ceil(list.length / +(process.env.N||4));
-const W = cols * CW * S, H = rows * CH * S, img = Buffer.alloc(W * H * 4, 0);
-for (let i = 0; i < img.length; i += 4) { img[i] = 120; img[i + 1] = 196; img[i + 2] = 168; img[i + 3] = 255; }
+const want = (filter || '').split(',').filter(Boolean);
+const list = ITEMS.filter(i => !want.length || want.includes(i.cat) || want.includes(i.id));
+const views = (flags.views || 'front,side,back').split(',');
+const baseEquip = {};
+(flags.base || 'hair:bob,top:tee,bottom:jeans,shoes:sneakers').split(',').filter(Boolean).forEach(p => { const [c, id] = p.split(':'); baseEquip[c] = { id }; });
+const S = +(process.env.S || 2), PER = Math.min(+(process.env.N || 4), list.length || 1);
+const W = PER * views.length * CW * S, H = Math.max(1, Math.ceil(list.length / PER)) * CH * S, img = Buffer.alloc(W * H * 4);
+const bg = (process.env.BG || '#74c4a8').replace('#', '').match(/../g).map(h => parseInt(h, 16));
+for (let i = 0; i < img.length; i += 4) { img[i] = bg[0]; img[i + 1] = bg[1]; img[i + 2] = bg[2]; img[i + 3] = 255; }
+const t0 = Date.now();
 list.forEach((it, n) => {
-  const eq = JSON.parse(JSON.stringify(base.equip));
+  const eq = JSON.parse(JSON.stringify(baseEquip));
   if (it.cat === 'dress') { delete eq.top; delete eq.bottom; }
-  eq[it.cat] = { id: it.id, color: it.hair ? '#d8743a' : undefined };
+  if (it.cat === 'top' || it.cat === 'bottom') delete eq.dress;
+  eq[it.cat] = { id: it.id, color: flags.color || (it.cat === 'hair' ? '#d8743a' : undefined) };
+  if (baseEquip.hair && it.cat !== 'hair') eq.hair.color = '#7a4a2e';
   views.forEach((v, k) => {
-    const buf = renderCharacter(v, { skin: n % 8, eyes: n % 8, equip: eq }, { blink: false });
-    const X0 = ((n % +(process.env.N||4)) * 3 + k) * CW * S, Y0 = Math.floor(n / +(process.env.N||4)) * CH * S;
+    const buf = renderCharacter(v, { skin: +(flags.skin ?? 0), eyes: +(flags.eyes ?? 0), equip: eq }, { blink: false });
+    const X0 = ((n % PER) * views.length + k) * CW * S, Y0 = Math.floor(n / PER) * CH * S;
     for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
       const o = (y * CW + x) * 4; if (!buf[o + 3]) continue;
       const a = buf[o + 3] / 255;
@@ -37,5 +53,5 @@ function png(w, h, data) {
   const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 6;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ih), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
-fs.writeFileSync(process.argv[2], png(W, H, img));
-console.log('items', list.length);
+fs.writeFileSync(outFile, png(W, H, img));
+console.log(`${list.length} items: ${list.map(i => i.id).join(', ')} (${Date.now() - t0}ms)`);
