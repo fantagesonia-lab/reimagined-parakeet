@@ -1,0 +1,2073 @@
+<title>Pixie Closet</title>
+<meta name="description" content="A browser dress-up character creator with pixel-art outfits, hair, hats and gear.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: a game client — stage window on the left, inventory window on the right, stacked on phones. */
+:root {
+  --sky: #cfe9f6;        /* page ground */
+  --sky-2: #f6eedf;
+  --wood: #6b4430;       /* window frames */
+  --wood-2: #8f5d3f;
+  --parch: #fbf3e2;      /* window bodies */
+  --parch-2: #f1e3c6;
+  --ink: #3a2418;        /* text */
+  --ink-soft: #7b5b48;
+  --accent: #f08a3c;     /* maple orange */
+  --accent-ink: #ffffff;
+  --sel: #3f6fd8;        /* selection blue */
+  --display: "Pixelify Sans", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; font-family: var(--body); color: var(--ink);
+  background: linear-gradient(180deg, var(--sky) 0%, var(--sky-2) 100%);
+  padding-inline: 16px; padding-block: 16px 32px;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sel); outline-offset: 2px; }
+.app { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+header.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.logo { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: .5px; color: var(--wood); line-height: 1;
+  text-shadow: 2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff, 3px 3px 0 var(--accent); }
+.tag { font-family: var(--display); font-size: 15px; color: var(--ink-soft); }
+.main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.win { background: var(--parch); border: 3px solid var(--wood); border-radius: 10px; box-shadow: 0 4px 0 var(--wood-2), 0 10px 24px rgba(80, 50, 30, .18); min-width: 0; }
+.win > .title { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: linear-gradient(180deg, var(--wood-2), var(--wood)); color: #fff4df;
+  font-family: var(--display); font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 12px; border-radius: 6px 6px 0 0; }
+.win > .title small { font-family: var(--body); letter-spacing: 0; text-transform: none; font-size: 12px; opacity: .85; }
+.pad { padding: 12px; display: grid; gap: 12px; }
+
+/* stage */
+.stage { position: relative; border: 3px solid var(--wood); border-radius: 6px; overflow: hidden; background: #9fd7f5; }
+.stage canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; aspect-ratio: 256 / 208; }
+.mapname { position: absolute; left: 8px; top: 8px; background: rgba(30, 20, 40, .62); color: #fff; font-family: var(--display); font-size: 13px; padding: 3px 8px; border-radius: 4px; }
+.nametag { position: absolute; left: 50%; transform: translateX(-50%); top: calc(188 / 208 * 100%); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+.nametag .nm { background: rgba(20, 16, 30, .78); color: #fff; font-family: var(--display); font-size: clamp(11px, 1.6vw, 14px); padding: 1px 8px; border-radius: 3px; white-space: nowrap; }
+.nametag .job { font-family: var(--display); font-size: clamp(9px, 1.3vw, 12px); color: #fff; text-shadow: 1px 1px 0 #000; }
+.bubble { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); max-width: 60%; background: #fff; border: 2px solid #3a2418; border-radius: 8px; padding: 4px 10px;
+  font-family: var(--body); font-weight: 700; font-size: clamp(11px, 1.6vw, 14px); text-align: center; overflow-wrap: anywhere; }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -6px; border: 6px solid transparent; border-top-color: #3a2418; border-bottom: 0; }
+.turn { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--wood); background: rgba(251, 243, 226, .92);
+  font-family: var(--display); font-size: 20px; line-height: 1; display: grid; place-items: center; }
+.turn:hover { background: #fff; }
+.turn.l { left: 8px; } .turn.r { right: 8px; }
+.viewlbl { position: absolute; right: 8px; top: 8px; background: rgba(251, 243, 226, .92); border: 2px solid var(--wood); border-radius: 4px; font-family: var(--display); font-size: 12px; padding: 1px 6px; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 2px solid var(--wood); background: linear-gradient(180deg, #fff9ee, var(--parch-2)); border-radius: 6px; padding: 6px 12px; font-weight: 800; font-size: 14px;
+  box-shadow: 0 2px 0 var(--wood-2); transition: transform .06s; }
+.btn:hover { background: #fff; }
+.btn:active { transform: translateY(2px); box-shadow: none; }
+.btn.go { background: linear-gradient(180deg, #ffb46e, var(--accent)); color: var(--accent-ink); text-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
+.field { display: flex; gap: 6px; align-items: center; flex: 1 1 200px; min-width: 0; }
+.field label { font-family: var(--display); font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.field input[type=text] { flex: 1; min-width: 0; border: 2px solid var(--wood-2); border-radius: 6px; padding: 6px 8px; background: #fff; }
+select { font: inherit; border: 2px solid var(--wood-2); border-radius: 6px; padding: 5px 6px; background: #fff; }
+.section-lbl { font-family: var(--display); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-soft); }
+.jobs { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 2px solid var(--wood-2); border-radius: 999px; padding: 3px 10px; background: #fff; font-weight: 800; font-size: 13px; }
+.chip:hover { border-color: var(--accent); }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.slot { border: 2px dashed var(--wood-2); border-radius: 8px; padding: 6px; display: grid; gap: 6px; justify-items: center; background: #fffaf0; }
+.slot canvas { width: 48px; height: 66px; image-rendering: pixelated; }
+.slot .row { justify-content: center; gap: 4px; }
+.slot .btn { padding: 2px 8px; font-size: 12px; }
+
+/* inventory */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab { border: 2px solid var(--wood-2); border-bottom-width: 3px; background: var(--parch-2); border-radius: 6px; padding: 4px 9px; font-family: var(--display); font-size: 14px; color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--sel); border-color: #26489a; color: #fff; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; max-height: 360px; overflow-y: auto; padding: 4px; background: var(--parch-2); border: 2px solid var(--wood-2); border-radius: 8px; }
+.cell { position: relative; aspect-ratio: 1; border: 2px solid #c9a985; border-radius: 6px; background: radial-gradient(circle at 50% 40%, #fffdf6, #f3e6cb); padding: 2px; display: grid; place-items: center; }
+.cell:hover { border-color: var(--accent); }
+.cell[aria-pressed="true"] { border-color: var(--sel); box-shadow: inset 0 0 0 2px var(--sel); background: radial-gradient(circle at 50% 40%, #ffffff, #dbe6fb); }
+.cell canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+.cell .x { font-family: var(--display); font-size: 12px; color: var(--ink-soft); text-align: center; line-height: 1.1; }
+.itemname { font-family: var(--display); font-size: 16px; min-height: 22px; }
+.itemname span { font-family: var(--body); font-size: 13px; color: var(--ink-soft); }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sw { width: 26px; height: 26px; border-radius: 6px; border: 2px solid rgba(58, 36, 24, .45); padding: 0; }
+.sw[aria-pressed="true"] { outline: 3px solid var(--sel); outline-offset: 1px; }
+.sw.big { width: auto; height: 28px; padding: 0 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; background: #fff; }
+.sw.big i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .3); display: inline-block; }
+input[type=color] { width: 34px; height: 28px; border: 2px solid var(--wood-2); border-radius: 6px; padding: 0; background: #fff; }
+.hint { font-size: 12px; color: var(--ink-soft); }
+
+dialog { border: 3px solid var(--wood); border-radius: 10px; background: var(--parch); color: var(--ink); padding: 0; max-width: min(92vw, 640px); }
+dialog::backdrop { background: rgba(30, 20, 40, .55); }
+dialog img { display: block; width: 100%; image-rendering: pixelated; border-radius: 6px; border: 2px solid var(--wood-2); }
+dialog textarea { width: 100%; min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; border: 2px solid var(--wood-2); border-radius: 6px; padding: 6px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #2a1c14; color: #fff4df; padding: 8px 14px; border-radius: 8px; font-weight: 800; }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="logo">Pixie Closet</div>
+    <div class="tag">character creator · pick a look, then hit the map</div>
+  </header>
+
+  <div class="main">
+    <section class="win" aria-label="Character stage">
+      <div class="title">Character <small id="statline">Lv. 1 · Beginner</small></div>
+      <div class="pad">
+        <div class="stage" id="stage">
+          <canvas id="view" width="256" height="208"></canvas>
+          <div class="mapname" id="mapname">Mushroom Meadow</div>
+          <div class="viewlbl" id="viewlbl">Front</div>
+          <div class="bubble" id="bubble" hidden></div>
+          <div class="nametag"><div class="nm" id="nm">Pixie</div></div>
+          <button class="turn l" id="turnL" aria-label="Turn left">◀</button>
+          <button class="turn r" id="turnR" aria-label="Turn right">▶</button>
+        </div>
+        <div class="row">
+          <div class="field"><label for="name">Name</label><input id="name" type="text" maxlength="14" value="Pixie"></div>
+          <div class="field"><label for="map">Map</label><select id="map"></select></div>
+        </div>
+        <form class="row" id="chatform">
+          <div class="field"><label for="chat">Say</label><input id="chat" type="text" maxlength="60" placeholder="Type, then Enter to show a chat bubble"></div>
+          <button class="btn" type="submit">Say</button>
+        </form>
+        <div class="row">
+          <button class="btn go" id="rand">🎲 Randomize</button>
+          <button class="btn" id="undress">Undress</button>
+          <button class="btn" id="snap">Snapshot</button>
+          <button class="btn" id="share">Outfit code</button>
+        </div>
+        <div class="section-lbl">Job outfits</div>
+        <div class="jobs" id="jobs"></div>
+        <div class="section-lbl">Closet slots</div>
+        <div class="slots" id="slots"></div>
+      </div>
+    </section>
+
+    <section class="win" aria-label="Inventory">
+      <div class="title">Inventory <small id="count"></small></div>
+      <div class="pad">
+        <div class="tabs" role="tablist" id="tabs"></div>
+        <div class="itemname" id="itemname">&nbsp;</div>
+        <div class="grid" id="grid"></div>
+        <div class="section-lbl" id="dyelbl">Dye</div>
+        <div class="swatches" id="swatches"></div>
+        <div class="hint">Tip: drag on the stage or use ◀ ▶ to turn. Keys: ← → turn, R randomize.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="title" style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,var(--wood-2),var(--wood));color:#fff4df;font-family:var(--display);padding:6px 12px;letter-spacing:1.5px;text-transform:uppercase"><span id="dlgtitle">Snapshot</span><button class="btn" id="dlgclose" style="padding:0 8px">✕</button></div>
+  <div class="pad" id="dlgbody"></div>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script>// Base body sprites traced 1:1 from tools/reference.jpg (front / side / back).
+// Each char is a palette index (a..p), "." is transparent.
+const BODY_PALETTE = ["#2d0b06", "#3d140d", "#5c3228", "#7c5246", "#a47364", "#d28e76", "#c4aea7", "#e7a78e", "#f4bca4", "#f9cab3", "#f4d3c1", "#fddfca", "#fde4d2", "#fde6d4", "#fde7d7", "#fdf9f5"];
+const BODY_SPRITES = {
+  front: { w: 81, h: 128, rows: [
+    ".............................ddddddddddccccccccccccccd...........................",
+    "............................baaabbbaaaaabbbbbbaaaaaabb...........................",
+    "...........................dbcdddddddddeeeeeeddddddddc..d........................",
+    ".......................bbbaaefiiiiijkkkjjjjjjjjjjjjihfbaaabc.....................",
+    "......................ccccccfhjjjjjlllllllllllljkjjjiheeeeebc....................",
+    "...................abbbfikkjlnommmmnmnnmmmnmmmmmmkjjjjjiijhbaaa..................",
+    "..................babbbiikkkmmmmmmmmmmnmnmmmmmmnmkkkjjjjjjidddca.................",
+    "................cacfhiiilllmnmmnmnnmmmmnnmnnmmmmmmmmmljjjjjiijiaaaa..............",
+    "................bbcfiiijllmmmmmnmnnmmnmnnnmmmmnmmmmmmmkkjjjjjjjccbbb.............",
+    "..............cbdfjkmonmmmmmnnnmnnmnnmmnnmnnnnnnmnmmmmnnljjjjjjiiffaa............",
+    "..............aadjjkmmmmmmmmmmmnnmnnmmmmnnnnnnmmnnmmmmmmmkjjjjjjjfhab............",
+    ".............ahiijlmmmmmnmmmmnmnmnmmmnnnmnnnnnmnmmmnmmmmmmmmmjjjjjjfeaa..........",
+    "............bbfhiillmlmnomnmmnmnmnnnnnnnnnmnnnnnnnnnnmmmmmmmmljjjjjffaa..........",
+    "..........dbdhiijjlmpppppnomnmnnmmnnnmmnnmonnnnnmnmnnmmmmmmmmljjjjjjjaa..........",
+    "..........dbhjjiklllpppppnonmmmnnnnnmnnmmnnnnnnnmmnmmnmmnmmmmmljjjjjlaa..........",
+    ".........bceijjjlloppppoommmomnmmnmnmnnnnnmnnmnmmnmmnnmmmmmmmmmlkjjjjffba........",
+    ".........bdfjjjjoopppppmnmnmnmnmnnmnnnnnonnnonnnnnnnnmnmnnmnnmmmnkjjjihaa........",
+    ".........afijjlmooooooonnmnnnnnnnnnnnnmnnnmnnnnonnnnnnmnnnnmmnmnojjjjikba........",
+    ".........agjjjlmooommmmmmnnnnnnnnmnnnnnmnonnnnnonnnoonnnnnnnnomnnjjjjjmba........",
+    "........ddhjjjlmmmmnnnnmmnmnmnnnnnnnnnnnnoonnmnnnnnnnnnnmnnnmmmnmlljjjkffba......",
+    ".......bdhjjjjlmmmmoononmnnmnnnnnnnnnnnnnoonnnnonnoonnnnnnnnnnmnmmmjjjjhfaa......",
+    ".......bdjjjjjmmmmmmnnnnnnnnnnnnnnnnnnnnnoooonnonnoonnnonnnnnnnnnnmjjjjijaa......",
+    ".......adjjjjjmmmmnnnnmmnnnmnmnnnnnnnnnnmnnnnnnnnooonnoonnnnnnnnnmmjjjjijaa......",
+    ".......adijjjlmnnnmmmmmnnmnnnnnnnnnnnnnnnnnnnnnnnooonnoonnnnnnnnmmmjjjjijaa......",
+    "......dadijjlmnnnnmnnnnmnnmnnnnnnnnnnnnnmonnnnnnnooonnoomnnnnoomnmmjjjjjkaa......",
+    "......dbdjjjlnnnnmmmmmnnnnnnnmmnnnnnnnnnoonnnnnoonnnnnoonnnnnoonnnmkkjjjkccb.....",
+    ".....bcfhjjjmnnnmmnnmmmnnnnnmnnnnnnnnnnnoonnnnnonnnnnnnoonnnnnnoonmmljjjjffba....",
+    ".....adijjjjmmmnnnmnnnnoonnnnnnnnnnnnomnoonnnnnnnnnonnnoooooonnooonmmjjjjhiaa....",
+    ".....aejjjjjmmmmmmnomnnnnmnnmnnnnoooonnnoonnnnnnnnnoonnnooooonnnnnmmnjjjjiiaa....",
+    ".....aejjjjjmmmmmnnoonononnnnnnnnnnnnnoonnnnnnnnnnooonnooonnonnnnnnnnjjjjhiab....",
+    ".....bejjjjjnmmmmnnoooommmnnnnmnnnnonnnonnnnnnnnnnoonmmnoooooonmmnnonjjjjijab....",
+    ".....bejjjjjnmnmmmnmmobbbinonnnnnnnoonnnnonnnnnnnnnnmooeaacoomnmnnnnnjjjjjjab....",
+    ".....bejjjjjmmoommmmcbbbbennnnnnnnnooonnnoooooonnnnnnoocbbaaenonnnnnnjjjjjjab....",
+    ".....bejjjjjmnoomllabmoooonmnnnnnnnooonnooooooonmmnnnnoomlljbdoonnnmmjjjjjjaa....",
+    ".....bejjjjjmooomllmlmnoonnnmnnnnnnooonnoonooooonnnnmmnmmlllooonnnmmmjjjjjjaa....",
+    ".....aejjjjjnonnnmmmmmmnnmnnnnnnnoomnnnnooooooooonmmmmnmmmmmmnnnnmmmmjjjjjjaa....",
+    ".....aejjjjjoonnnnnnmmmmmmnnooooonnooooooooooonmnnmmnmmmmmmmmnnnnmmmmjjjjjjaa....",
+    ".....aejjjjjoonmmnnnnmmmmmnnooooooonnnooonooonnnnnmmnnnnnnmmmmnmnnnonjjjjjjaa....",
+    ".....bejjjjjmnnnmnonmnnnnnnnnnnoooonnnnnnnooonnoonmnnnonnnnmmmmnnnnnmjjjjjjaa....",
+    ".....beijjjjlmmnnnnnmmmnooonmmnnonnoooooooonnnnoonnmnmmnnnnmmmnnnonmmjjjjiiba....",
+    ".....beijjjjkmmnomnmmoooppoonnnnmnmnnnooonnmnnnnnnnmmlmooppoooooonmlljjjjijaa....",
+    ".....adfhjjjjlmnooomdaaaabckooonnnnnnnnnoonnnnnoooonmgbaaaaceoomonmlkjjjjffa.....",
+    ".....adfhjjjklmmnogabaaabbbafmnnnmnnmnnnnmnnmnnooooodbaaabbabclmmnnkjjjjjffa.....",
+    "...baaabejjjjjlmmoabaaaabaaabomnnnnnmnnnnnnnnnnnmmofabaaaaaaaaammnokjjjiibaabbb..",
+    "..aaaaaadjjjjjmmlaaaaaabaaaaabooonmnnnnnnnnnnnnnnmoabbaabbaaaaadoookjjjhdaaaaabc.",
+    ".befkliebeikjjombaaaaaaaadpabbonnnmnnmnnnnnnnmnnmooaaaabbbpaabbbdkjjjjidafjloheba",
+    "badhjlihdcijjjkeaagaaaaacpppbboonmnnnnnnnnmnnnnmnooaaababpppcacbajjjjijcblkmohhaa",
+    "bagllmmoidhjjjjcbaoaaaebbdpabboonnmnnnnnmmmmnmnnmoobbbbabcpdbanbajjjjjiflomnnkkaa",
+    "bagmmmnohfhiijjdbopbaeopdbababmonnnmnnnnmnnmnmnnmoobbbbkkbaaaaodbkjjjjifklmmmklaa",
+    "bagmmmnmhfffjjjkbppbcopppbbbablmonnnnmmmmmmnnmmnnooabbcmkbbaaaodcjjjjjhhhllllloaa",
+    "bbgmmmmlihdfjjjjkppbbbbfcbbbablmonnmnmmnnnnmnnnnnooaabbccbbbbaodkjjjjjhiimmmlloab",
+    "bbgnllmlihcejjjjlopbaabbbbcbbbonnnnnmmnnnnmnmnnommoabbbbbbcbbapmlijjjfeiimnmmloab",
+    "bafjlmmljicejjjjlmpaccdbccccbbonnnnmmmmnnnmmmmnomnoaccdcbdccbapmliijjfekkmmonjiaa",
+    "dabflnmmlmfbijjklnpbccedeedcbbonmnmmmmmmnnnnmmmmoooabcedeedcbaolliijjbhommmnndba.",
+    "..acilmlmofchhjkmoocbcceeecbaeoomnnmmmnnnnnnnmmmnnmbacdeedcbbgmmliiihbhmmmmljcac.",
+    "..bbefjlmoiddfjklmmkbbccccbbdmoonmmmmmmmmnnnmmmmmmmkbbccccbbbmonlijedehlmlkccbc..",
+    "...baafmoohfabkkliijgbbbbbbemmnoommmmnnmmnnnnmnmmmmoodbbbbbekiijjiibbfhllihaac...",
+    "....dacegfeeaakkliiikkllnoooonnnnmmnomonmlmmnonnmnoooooomlkljijijfhabcccccca.....",
+    "......abbaaaaajikkkkiiiijjmmoonmmmmooaoomlkamnonmmnnmolijiihijjjjfcaabaaaaa......",
+    "........cccccbafhjkkiiijjklmmmmmmmmoonbdccbmmmmnnmmmmmjiiiiiikjfhcaa.............",
+    "..............bafillljjkonmmmmmmmnnooooikinnmmmonnmmmllljkjjlkifeaa..............",
+    "..............caaabfjjnnommmmmmmnonooonmlllmnnoonnmmmlmllmkjhcaaaa...............",
+    "...............bbbbciilmnllmmmmmnnnnmmmmmmmmnnnnnmmmlllllolhfabaa................",
+    "...................baaaaiiklnnnononmmmmnonmmmonmmnmlliihfaaaba...................",
+    "...................aaaaaefijmoooomlllmmooonllnmmopnjjiffbabcc....................",
+    "........................aaaaaaaaaaaffhhiijihfcaaaaaaaabba........................",
+    "........................abaaaaaabaabeffhiiifdbaaaaaaaabbb........................",
+    "..............................aaaabljlllnnmjjjfcaaa..............................",
+    "..............................aabefjjlmmmlkjjiffcbaa.............................",
+    "............................cbfhonollmnnmmmnooolonldbb...........................",
+    "...........................aaafimmmmmmnmmmmmmmmmmlkebaa..........................",
+    "..........................acoollmmmnnmnmnmmmmmmmnooolfaa.........................",
+    ".........................adellllmmnonmnmmmmnmmmnnonmlhfbb........................",
+    "........................aapnmmlmmnnmmnmmnnnmmnnnmnmmlllcb........................",
+    ".......................cbbponnlmmnmmmnnnmmmmnmmnmmlllmocbc.......................",
+    "......................aaehooomllommnmmnmmmnmnnmmlkilmmnidbb......................",
+    "......................aajioonjjkpmmmmnnmmnmnmnmmlkfilmlihcb......................",
+    "......................aapmmnihjlommnmmnnnnnnnmmmmmfhjklmlcb......................",
+    ".....................baconooffllmmmnnnnmnnnnnnmmmnfhjkonoecac....................",
+    "....................badfllnoffonmmnmnmnnnnnnnnmmllhfjlonmheaa....................",
+    "....................bamjlljjhhoonnnnnnnnnnnmmmnmmlihfhnmmlkcb....................",
+    "....................abpomliihhooonnnnnnmnnnnnmnonmihfhllmomdbd...................",
+    "...................adfoonmffiimnonnnnoonnnnnnnnonoojffikmnonicb..................",
+    ".................dabgmnnooffijlmmnnnnonnnnnnnnnnmoojffhkmnmliba..................",
+    ".................acejlmmmoeejjlmnnnnnonnnnnmmnnnnnmjhffkomllkca..................",
+    ".................bejlllljkcammmnnnnmnonnnnnnnnnnnnmkidejommlleda.................",
+    ".................bfmlllliiaaooooonmnnnnnnonnnnnooonkidahllmooifaa................",
+    "................bbkommlmhhaaoonnnnnnnnnnoonnooooonnlkdafikmonoocb................",
+    "...............bbflommmnhhaaommmmnnnnnnnoonnooooonnlleaehklmmmncca...............",
+    "..............abfiooonkkecbelmmmnnnnnnnnoonnooooonmmkfcbfjomnmmffba..............",
+    "..............aafimnnmjjdadflmnnnnnnnnnnoonnooooommmkfeabjknnmmhfaac.............",
+    ".............aehlmonkjffaaihmnoonnnnnnnnnnnnoooonmmmkihcaehkooomlliaa............",
+    "............abhkmmmomlffaaiilmnnnnnnnnnnnnnooooonmmljihcaefknmmmljhaab...........",
+    "..........cahkoommmmmnfcbakkmmnnnnnnnnnnnonnoononnmljiidbbimommmllljfaa..........",
+    "..........cagmnnmmmllmihbalmmmmnnnnnnnoooooooonomnmljjidbfjmmllmmmlljaa..........",
+    "..........caklonmljilmlmaammmmnnnnnnnnooooooonnommmmmkidagmljjklmmmopaa..........",
+    "..........cakoonmliimomlaamnnnnnmnnnoonnnnooonnmmmmnnlidagokiiklmmoopaa..........",
+    "..........cbkonnmlkjjkmlaamnnnnnnnnnnnoooonnnmnmmnnnomkdagliiklmmmmlpaa..........",
+    "..........cbgkmlmmmnhfjfbamnnnnnnnmmnooonnnonmmmnnoonmldbeihhlnnnomijaa..........",
+    "..........cbfillmommfffcaamonnnnnnnnmmoommllmmmmnnnnmmmdbceffllmmmmieaa..........",
+    "...........dbahimoolecaaaaoonnmmnooljhhhhhhijlnnnnnnmmodbbaaflllliibbc...........",
+    "............bafhmnmhcbb.baoooonmmnoljhfhhiijklnnnmmmmmmdbcaabkllkheba............",
+    ".............dbbbbbbbd..baonmnnnmmnljfbabbbilmmmnnnnmllda..cbbabbaac.............",
+    "..............baaaaad...ballmmoonnmljfaaaabgklmoonnmmkjda...daaaaab..............",
+    "........................baijlmoooomkjfbd.cbgjlooonnnmkjdb........................",
+    "........................aaijnonnonmjifa..dbgjlnnnnnnnljdb........................",
+    "........................caiiooooonmjhda..dbfilnnnmmnnihba........................",
+    "........................baiimmmmmnojheb..dbfilommmmmmifca........................",
+    "........................aahfjjlmlnkiheb..daefiklmmmljhfcb........................",
+    "........................aaffjjlmlmjhfead.caefijklmmljihcb........................",
+    "........................aajijjkjjjjihead.dafhijjjjkkjiicb........................",
+    "........................aajijjjjjjjihfad.dafhjjjjjjjjiica........................",
+    "........................aajijjjjjjjihfad.dbfhijjjjjjjiica........................",
+    "........................aajijjjjjjjihead.dbfiijjjjjjjjjcb........................",
+    "........................aajjjjjjjjjihead.dbhiijjjjjjjjjdbd.......................",
+    "......................aaeeffjjiifhjiifb..dbhiiiijjjjjiffebb......................",
+    "......................aaeeffjiiihhjjifa..dbfiiiijjjjjiffebb......................",
+    "......................aahiommlllmjihfea..dbeffiilllloookibb......................",
+    "......................aajlommmmmoniffea..daeffiimmmnooomibbd.....................",
+    "....................baeipppommmooomjfcb..dbbfilmmnnnmnoookeba....................",
+    "....................aaijpppnmnoommlihda..daehjmmnooonnmmljhba....................",
+    "....................aamjnmomooonnmmkjfa..dahjkmmnoooonmmljibb....................",
+    "....................aaljlmnnooommnnlkfad.cagklnnnoooonnmmjjbb....................",
+    "....................aajilmonnnmmlmnlkfad.cagkmoonmnonmmmmjibb....................",
+    "....................aahhjlonmmmmkkihhead.daefijlnmmmmlnmlhhaa....................",
+    "....................aaffjkkkklllkjhfedbd.dbcefikkkkkkkkkkfeba....................",
+    ".....................cbbbaaaaabbbaaaaa.....bbaaaaaaabbbbbbba.....................",
+    "......................aaaaaaaaaaaaaaac.....caaaaaaaabbbaaab......................",
+  ] },
+  side: { w: 71, h: 131, rows: [
+    ".............................aaaaaaaaaaaaaaaaaaac......................",
+    ".............................bbbbbbbbbbaabbbbbbbc......................",
+    "......................bbbbbbdfhhiiikkkkihghihhhfeccbb..................",
+    ".....................baaaaabehjijllmmnmljjiijjjhebbaa..................",
+    ".................ddcceeggggklmoommmmmmmmllllljjjjhhhhaccc..............",
+    ".................bbbbfhllllmmnoonnmmmmmnmmmmokkjjiiihbbbbd.............",
+    ".............dccbefgkmmommmmmmmnnnmnmmnmmmmnooomlkjiijjjida............",
+    ".............baaahjmononmmmmmnnnmmnnnnnmnnnnnnmnmmmjjjjjidaa...........",
+    "............dccddlllmmmnnnmmmmnnnnnnmnnnmnmmmmmmmmoookjjiihba..........",
+    "...........bbfloonmmmmmmnmmnmnnmnnnnnnmnmnnnmmnnmmnonjjijiicb..........",
+    "..........ccdjlnnnnnmmmmmmnnnnnmmnnnnnnnonnnnnmnmnnnnlljjjiffbb........",
+    "........dadhjllmmoonmmmmmnnnnnnnnnmnnnnnnmnnnnnnnmnmmmmjjjjjjcb........",
+    "........cadjklmloppoommmmmnnmnnnnnnnnnnnnonmnnnnnnnnmmmkkjjjjfebb......",
+    "......cadhjlmmnoppppponnmnmmnnnnnnnnnoonnnonnnnnnnnnnmmmmkjjjihba......",
+    "......cadhkllmppppppponnmmmnnnmnnnmnnnnnmooooooonnnnmnmmnljjjiiba......",
+    "....dbehlmllmopppppomnmmmnmnmnnnnnonnnnnnooonooooonnnnmmmljjjjjhhaa....",
+    "....dbgkoonmoppppppnmommmnmmnmnooooonnnnnoonnooooonnnnnmmmljjjjjhaa....",
+    "....dbkloonooppppoonmmmmnmnmmnmoooooooooooonnooooonnnnnnmmmkjjjjjaa....",
+    "....cagoonmmoppppommmmmnmmnmnnnnnnnnooooooonnooooonnnnnnnmmjjjjjjab....",
+    "..daehlnnnmmnooooonnmmmnmnnoonnooooonnnoonnnnonnnooooonnmmmkjjjjjhhaa..",
+    "..dafilmnnnnmnnmnnmmmnnnnnnoooooonoonnnoooooooonoonnnnnnmmmlkjjjjhhaa..",
+    "..dagmmmnnnmmnmmmnmmmnmmmnnooooooononnnooooooooooonnnnnnnnmmnjjjjiiaa..",
+    "..dbgommnmmmmnnnmmmnnnnnnnooooonnooonnnooonoonononnnnnnnnnmmmjjjjijaa..",
+    "..dbgoommnnnnmmmmnmmnonnnoooooonoooonnnoooononooonoooonnnnnmmjjjjjjaa..",
+    "..dagoommnnnnnnnnmnmnnnoooonnonnmnnonnnoooonnnooononnnnnnnnmmjjjjjjaa..",
+    "..ddimmnmmmnnnnnnmmmoonnnnmnnnonnnoonnnnnoonnoooooonnnnnmnnnmjjjjjjcc..",
+    "baehlmnnmnnnnnmnnnnnoonnnnnnnnnnnnoooonmnnnoonooooonnnnnnnnnmjjjjjjffaa",
+    "baejmnmnnnnnnmnnnnnnmnnmmnnnnnnnonoooonnnnmoononooonnnnnnnmnmjjjjjjhiaa",
+    "cbgnmmmnnnmmnnmnmonnnnnnnnnnnooooooononnnmnooooonnoonnnonnnmmjjjjjjiiaa",
+    "cagmmmnnmmmmnnnnooonnmmmmnnnnnoooonooonnmnnnnooonnnnoooonnmnmjjjjjjjjaa",
+    "cagnmmnnnnnmmnnnnoonmnnnnmmnnnooooonoomnnonnnoonnnnnoooonnnmmjjjjjjjjaa",
+    "bagnmmmmmmmmnnmnnnonmmnnnmnnnnoooonnnnmmmonmmmmnnnnmnooonnmnmjjjjjjjjaa",
+    "bagonnmmnnnmnoooommmmmmnmnmmmnooonnnoonnnnnnmmnnnnoonnnonmnnnjjjjjjjjaa",
+    "bagnnmmmnmnnnokcbabgmmmnmmmnnmnonmnnnmnmnmmmmmnnmnoooonnnmnnnjjjjjjjjaa",
+    "cagnonmmmnnnmmkgggebcmmoonnmmnmnnnnnmnnnmmmnnnmmnnoooonnmmnmmjjjjjjjjaa",
+    "cagonnmmmnnnmmmnmmmjbgoomnmmnnnmnnnnnmnnnnnmmmmnnnnnoooommmmmjjjjjjjjaa",
+    "cagnmmmmmmnnnmmnmmllooonnnmnmmnmmnnnnmnnnmmnnnmmnnnnnnmnnookjjjjjjjjjaa",
+    "cagmmmmnnmnmnnnnnmmmnmmmmnnnmnmnnonnnnnnmnnnmmnnmmomnnnnnooljjjjjjjjjaa",
+    "cafllmnnomnnmmmmmmmnnmmmmmnnonnmnnmnnnnmmmmnnnnnnmnnmmmnoooljjjjjjjjjaa",
+    "bafklnnnoonmmmmmmnnnnmmmmmnmnnnnnnnmnnnmnmnmmnnnnnnnmnmnoookjjjjjjjjjaa",
+    "bafkmooonnmmmmmnmnmmmmmnnmnnnmnnnnnnnnnmmnmmnnmmmnnnmnmnmnmkjjjjjjjjjaa",
+    "bbfimonnmmmmmnooommmmmnnnnnnnnmnmnnmnnnnmnnnmmmmmmnnmmnonljjjjjjjjjjjaa",
+    "cbehmommmmmmnooooomlmmooonnnmmnmnnnmnmnmnnmnnmmmmnmmooonmkjjjjjjjjjjjaa",
+    "..dbgommmmmooogbbbbbbkooonnnmmnnnmnmnmmnmmmmnnmmmmmooonmljjjjjjjjjjhhaa",
+    "..dbgommmnooogbbaaabbbcnmmmmnmnnmnnnmnnmnnnnmmmmmooooonmmjjjjjjjjjjfeaa",
+    "..cagmnmmnnoobbbaaabbbacommmnmmmmmnnnnnmmmolfffffmmmnlljjjjjjjjjjjjaa..",
+    "..caglmonnmmodbaababbaaaalnnnmmmmnnnnnmmmnneddddaflmllljjjjjjjjjjjjaa..",
+    "..daglnooommllaaaaooaaaabgoonmmmnnmnmnmmljfhoomlleflmjjjjjjjjjjjjiiaa..",
+    "..dbgkoooommllabbkppoakbbboommmmmnnmmnmlkfenommmnhdhmjjjjjjjjjjjjihaa..",
+    "..dbehlmnnmmlmabbbkpaapcaannmmmnnmnmnnnljhilmlmnoljdejjjjjjjjjjjjffaa..",
+    "..dacelmmmmmmobbbbbaaappaanmmmmmnnmnmmolknllllmmnondcjjjjjjjjjjjjfba...",
+    "....bbknmmmmoobbbbbbbbppacmmmmmmmmnmnmnmmomjjmmmmmlebjjjjjjjjjjjjbb....",
+    "....bbkonmmoooabbabbbbppboonmmnnmmnnnmmmmoojkonmmllebkjjjjjjjjjihbb....",
+    "....bbkonmmnnoacbabcbbppimnmmmmmnnnnnnmmmnnjkoommmleckjjjjjjjkjfeaa....",
+    "...acelmnnnmmmaccaddcbpollmmmnnnnmnnnnmmmmljjoonnmnfbjjjjjjjjjjdaa.....",
+    "..daehlmmmnmnobcceecbapmlmmnnnnmmnmmnonmmmljjnnoomjebjjjjjjjjffcb......",
+    "..dbgmmmmmmnoobccddcbmlmmnnnnnnnmmmmnnnnnmlllmnnojhcdjjjjjjjjfcac......",
+    "..dbkonnnmmmmngbbccbcklnnnmnnmnmmmmmmnmnnnmmmmnooedbjjjjjjjhfbad.......",
+    "..dbkonmnnnmmmmgaaadljjkkoommmmnnmmmmmnmnonmllmjjfaijjjiihhdbbc........",
+    "..dafllllooomllmolkjkjjkjoommmmnmmnnmmnjjlnllkkecchjjjjhhebbb..........",
+    "...aehllleeoommmljiijkkmmnmmmmmmmmmmmnnjjhilliicaijjjiihfcaa...........",
+    "....aaiccdmnonnnkjiiilmmnmmmmmmmnnmmmmnkjcbbaaaajjjjjffbaa.............",
+    "....dbfjgmlmonnmmmklmmmmmmmmmnnnmmmmlkjjjieaaabiiiihhbabdd.............",
+    ".....beglllmnnmmmmmnnmmmmmmmmnmnmmmlljijiiijjiihhhhffab................",
+    "......abbelmlmmmmmnonmmmmmmmnononnmjjjjiiijiiifebaabb..................",
+    "......caachklmlmmnonnmlllmmmmmmmmlkiiiihihihfeecaaabb..................",
+    ".........bbbabfhikkkkkjjiijjjjjihhhfedcccbbbbaaa.......................",
+    "..........aaaadffgggggggfffgghheeeedddcccbaabbaa.......................",
+    "..............aaaaaaaaaaaaabbabcddfiihhaab.............................",
+    "..............baaaaaaaaaaaaaabeeeffiihibaa.............................",
+    "...........................bahhlmnmmljjhfaa............................",
+    "...........................bahhllmmmkkkihab............................",
+    ".........................aahjmmmmmmmnnoomffaa..........................",
+    ".........................aajkommmmmmmmmmlhfaa..........................",
+    ".........................adkkmmmmmoooomlljlba..........................",
+    ".......................bbeimmmmmnmmppmmmlooaa..........................",
+    ".......................bamlmmmmmmkjoonnomooaa..........................",
+    ".......................aammmmnnonjjlmmnmnmodbc.........................",
+    ".....................baeelmmmmmnoiinmmmmmnoffbc........................",
+    ".....................aahjmmmmmmmnhhonmmmnoojjba........................",
+    ".....................bblmmmmmmmmmffmlmnnonmjlaa........................",
+    ".....................bbmnmnnnnnnohhiinooomljlaa........................",
+    ".....................bbmonnnnmmnojjhhoonmmmlmaa........................",
+    ".....................abmoonmmmmmnjjffoonnmonoba........................",
+    "...................cceeoonnnnnnmljjdeoonmnmmodcc.......................",
+    "...................bahjmmnonnnnnnmlcdnmmnnmllfebc......................",
+    "...................baklnmmnnnnonoooddkjlmmmmlifbd......................",
+    "...................balnonmmnnnnnnooeeijlmmmnojgbc......................",
+    "...................bamnmnnmnnnnnnooeeiimmmmnolgac......................",
+    "...................balmmmmnnnnonnmmhieeonmmmmjgac......................",
+    "...................balmmmnnnnoonnmlhieeooommlifad......................",
+    "...................balmmmmnooonnnmmjjbcmlonmlifbd......................",
+    "...................balmmnoonnnnnonnljaakknnnmjhbb......................",
+    "...................balmmnnonnnnnnonliaajjmnooomjda.....................",
+    "...................balmmnnnnnnnnmmnkhaalmmnooolidad....................",
+    "...................balmmmmmmnnnonmlecggpommnnnmlihaa...................",
+    "...................balmmmmmnnnnnnmldckoppmmmmmllihab...................",
+    "...................ballmnnnnnnnonmladmopoommmmlmkjab...................",
+    "...................aaijnmonmnnnnnmmadnmnnonmmmonkjaa...................",
+    "...................aajkoonmmmnnnmmoadnlmmmmmmmmnkiaa...................",
+    "...................bahhmnmonmnmnnoobckjllmnnnmjjihaa...................",
+    "...................bbhhjkmnmmmmnooobbjilmmnnmljiifbc...................",
+    ".....................bahimmmnnnnmmolhbaiilllkjhfcab....................",
+    ".....................aahillnmonmmmnljaaehllllhhfaa.....................",
+    ".....................bbcciinnommmmmmlifaaaaaaaabb......................",
+    ".....................babaiionmnnnnmmljibbababaaa.......................",
+    ".....................bahbdfonnmnnnmmmjjjifeac..........................",
+    ".....................bahhafmomnmnmnnmjiiifeac..........................",
+    "......................bdfbammnommmmmmjjiifead..........................",
+    ".......................bbbakkmmnmnnmmjjiifebd..........................",
+    ".......................babakjlmnnnmmmjjjjfead..........................",
+    ".......................bacaihllmnnmnmjjjjfead..........................",
+    ".......................baddeellmmmmmnjjjjhead..........................",
+    ".......................aahhaamlmmmmmmjjjjhfad..........................",
+    ".......................aaijabmlmmmmmmjjjjhhbd..........................",
+    ".......................bakkaallmmmmmnkkjjjhad..........................",
+    ".......................bajjaajinmmmmokkjiihac..........................",
+    ".......................bajiaahhjkjkkkkjjjihba..........................",
+    ".....................abcchfaaffjjjjjjjjjjiheac.........................",
+    ".....................aaddhhbbffjjjjjjjjjjhffbc.........................",
+    "...................aaihifecppoolmnmlllkjjihfhab........................",
+    "..................cbbhifeddloommmmmmmmliiiifhbb........................",
+    ".................bbfkjhhhomoommmnmnnmmllljjijbb........................",
+    ".................bbkpihjjppppoonoonmmmmlljijkaa........................",
+    ".................bblohhppppoonoonnnmmmmmljjjkaa........................",
+    ".................bbmlffpplllmnonmnnmmmljjjjjjaa........................",
+    ".................bbllfflmlllmmnmmmmnmjjjjjiijaa........................",
+    ".................bbiieefhjjjkkkkjjjjjjjjihhffbb........................",
+    ".................bbhheeffiijjjjjjiiiiiiiiffffbc........................",
+    "..................cabaaaaabbbbbaaaaabbbbbaaaad.........................",
+    "...................bbaaaabbbbbbbbbbbbbbbbbbbb..........................",
+  ] },
+  back: { w: 82, h: 129, rows: [
+    ".............................aaaaaaaaaaaaaaaaaaaaaaaaa............................",
+    ".............................baaabbbbbbbbbbbbbbbbbabbb............................",
+    "..........................ccbdfhhfggkkjjgggggggghhhhffccccc.......................",
+    ".......................bbbbbchjjjlmmmnmmmmmnmmlljijjhhbaabbb......................",
+    ".....................dadegggkknmlmmmmnnmnnmmmmmmllmmlkggggfcc.d...................",
+    "...................baaajoommmmnonmmmmmmmnmnmmmmnnmmmmlllmlidbaad..................",
+    "..................cbdddknmmmmmmmmmmmnmnnmnmmnmnmmmmmmmmmnmlgeedc..................",
+    "................abbfnnmmmmmmmmmmmmnnmmnnnnnnnmmmmnmmmmnmmmmlllidaaa...............",
+    "................acdhnnmmlmmmmmmmmmnnnnmnnnnnnnnmnmmmmmmmmmmmmmkedcbb..............",
+    "..............abehklmmmmmmmmmmnnmnmnmmnnnnnnnnnnnnnnmmmmmmmmmmmmmihbb.............",
+    ".............abbfjlllmnmmmmmmmmnnmnnnmnnnnnnnnnmmmnmmnmmmmmmmmmnnjhbbb............",
+    "...........acfillmmmmmoomnmmmmmnnmnmnnnnnnnnonnnnnnnmmnnmmnmmnmmnnojfeac..........",
+    "...........bcfjmlmmmlloonmnmmmmnnnnnnnnmooonnonnnnnmnnnmmnnmmnnmmmljfeac..........",
+    "...........bdlommmooppppmmmmmnnmmnmooooononnmnmmnnnnnmnnnmmmmmmmmmlkihbc..........",
+    "...........adoonmmppppppnnnnmnnmmmnnnnnnnoommnoonnnmnnmmnmnmnmnmmmmlkgbc..........",
+    ".........aceinnommppppppmnmmmmmnnmnmnnnnnoonnnoonnnnnnnnnnnnmnmmmmmmlkhebb........",
+    ".........adjkmnnmoppppnomnmmmnmnnmnnnmnnnoonnnnnmnnnnnnnmnmnnnmnnmmmmlkibb........",
+    ".........bdmlmmnnoppppmmnommmmmmnnnnnnnnoonnnonnnnnnnnmnnmnmmnnmnnmmmmkkbb........",
+    ".........beommmmnoooonnmmmmmmnmmmnnnmnnnooooomnnnmnnnmmnnnnmmnmmmnnmmmkkaa........",
+    "........deioonmmmnonnnmmmmmmmnnnooomnmmoooonnnnnnnmmnnnnnmmmmnnnmmmmmljjddd.......",
+    ".......ackoooonmmmnnnonmnmnnnnnmnnnnnooonnnnononmnnnnnnmnnnnnmnmnnmnmljjhfaa......",
+    ".......admnnoonmnnnnnnnmmnnnmmmnmnnnnooomnnnnoooooomnnmnnnnmnmnnnmmmmljjijbb......",
+    ".......adlmnnnmmnnmnnnmmnmnnnnnoonnoooooonnonnoooonmnnnnnnnnnnnnnmmmmmkjijaa......",
+    ".......adlmmnnnmnommmnnmmmmnnmnnnnmnoonoooonnnnononnnnnnnnnnnnnnmmnmmmkjiiaa......",
+    ".......admmnmnnmnommmmmmnnmmnonnnmmoooonooonnooononnnnnnnnnnnnnmnmnmmmjjjiab......",
+    "......badonmmnnnnnnnnnnnnnnmmonmnnnonooonooonoonnonnnmnnnnnnnnnnmnnnmmjjjjba......",
+    ".....bcfioonmnnnnnnnonnnnmnmoononmmonnonnoonononnonnnnnnnnnnmnnnnnnmmmjjjjffbb....",
+    ".....achjoonnmmnnmnmnmononnonnmnmoooonoonoooonnnmnnnnnnnnnnmnnmnnnmommjjjjhfaa....",
+    ".....acjkonnnmmmnnnmnnooomoomnnmnonnooooooooonnnnmmnnmnnnnnnnnnnnnmmmljjjjjiaa....",
+    ".....acjkmmnnmmnnnnnnonmnooonnnonnnooooonnmmnnnnnnnnmmnnnnnmnnnnmnmnmmjjjjiiab....",
+    ".....adjkmnmnmmmmmnnnonnnoonnmnnonnnoooonmnnnmmnnmmnnnmmnnnmnnnnnmnnmmjjjjijbb....",
+    ".....adjknnomnnnnnnnonnnnonnnnnmnooooononmnmmmmmmnnmmmnnnnnnnnnmmnmmmmjjjjjjbb....",
+    ".....adijmnnnmmmnnnnnnnmmonnnnnmnnnoooonmmnnnmmnnmmmmnnmnnnnnmnmmmmmnmjjjjjjab....",
+    ".....adjkmnnnnmmnmmnnmmnmonmnnmnmonooooommnmnmmnmnmmnmnnnnnnnnnnnnnnnljjjjjjab....",
+    ".....adjklmonnmmmnnmnnnnnnmmnmnnnmnnmnnnnnnmmnnmnnnmmmmnmnnnmnnmnnnmlkjjjjjjab....",
+    ".....bdjjjknnmmmnonnonnnnonnmnnnnnnnnnnmmmnmnnmnnmnmnmmmnmnnmnnnnmnljjjjjjjjaa....",
+    ".....adkjjkmmnmnnnmnnmmnnnonnoonnmnnnmmonnmmnnmnnnmmnmmnnnnnnnnnnnnljjjjjjjjaa....",
+    ".....adjjjkmnnmmmnnmonnmnmonoooonnnmmnnonnoonnnmmmmnmmmmmmmnnnnnmmmljjjjjjjjaa....",
+    ".....adjjjkonnnmmnnnonnnnnnnnnmnnmmnmnmooonomnnnnmnnnmnmnnmnnnmnmmnljjjjjjjjaa....",
+    ".....bdjjjkmnnnnmnmmnoonnonnmnnnmmnnnnnonnnnnnmmmmmmmnnnnmnmnnnmnmnljjjjjjjjbb....",
+    ".....bdiijjlmnnnnmmnnoonoonnmnmnmmmnmnnnnnnmnnmmnmmnmnnmmmmnmmnnnmnljjjjjijjbb....",
+    ".....achhjjjknnnnnnnnnmnoonnonmmnmmnnnnnoommmnnmmmmmmmnmnmmnnnmnonmkjjjjjjhhb.....",
+    ".....acfhjjjlnnnnnnnnnnmnnnnonmnnnnnnnnnnnnnnnnnmmnnmmnmmmnnnnnnnmljjjjjjjhfa.....",
+    "...bbaacfjjjkonnmmnnnnnnnnnnonnmnnmnmnnnommmnmnnnmnnnmnnnnnnnnmmmkjjjjjjkkbbabbc..",
+    "..dabaaacjjjknmmmmmnmnnnoommomnmnnnmnmononnnnmmnnmmnnmmnnmnnnnmmmjjjjjjjjibaabbb..",
+    ".ccdjkjebeijjjmnnmnmnoooooonnnnonnnnnonmnmmnnmmmmnmnmnnnmnnnnnmmnkjjjjjjfcdilnheb.",
+    "badhjljiebfjjjlmmnnmnnnnnnooonnnnnnnoonmmnmnnnnnnnmmnnnnnnmmmnonmjjjjjjjbdilmlihaa",
+    "aafjlmnmjeejjjlmmnnnnnmnnnoonooonnnnnonnnnnmnmmnnmnnmnmmnnmnnoolljjjjjjjeilmmmmlaa",
+    "aagllmmmlifjjjlmommnmnmmnnooooonooononnnnnnnonnmnnnmmnmnnnonmmoljjjjjjjiflmmnnmmaa",
+    "aagoonmmifhjjjkkonmmnnoooonnoonnooonnonnmmnnonnnnnnnmnnnnnonmnnkjjjjjjjihilmnmmmaa",
+    "aagmmmmlifhijjjjnmmnmoonnnnnnooonnnnooonnnnnoonnmmnnnnnnnnnnnnnkjjjjjjjjiimmmmloaa",
+    "bbgmllllihhhijjjmnonnoomnnnnnooonnnnnnnnnnnnnmmnnmmnmmnmnnmnnkkjjjjjjjhiiillmlklaa",
+    "bbgkmmlljiifijjjllonmnnnnnnnoooonnnnnnnnnnnmmmnnmmnmnnnnnmnmnkjjjjjjjjfhiillmliiaa",
+    "dadhkllllljfijjjjjmmmnnonnnnonnonnnooooonmnnnmmmnnnmnnnnnnnkjjjjjjjjjifhlkmmmlfea.",
+    "..adhilmmojfhijjjjllmnmnnnoooonnnnnnnnoonnnnmmmmnnnmmmmmmlljjjjjjjjjjifhmlmlkjcba.",
+    "..dafjlmnmiffhjjjjjjommmoonnnnnmnnmnnnnonnnmmmmmnnnmmnmljjjjjjjjjjjihhfhmmllhhbb..",
+    "...caafjjkhfffjjjjjjllllmnmmnnnnmnmnnooonmnmmmmnnmnmmmlljjjjjjjjjjjifdfhjjihaaa...",
+    "....babijkhfdbkjjjjjjjjjjlnnnmmmmmmnnnnnnnnmmmmmmnnljjjjjjjjjjjjjjhfcafhjjieaa....",
+    "......bbbaaaabfijjjjjjjjjlnnmmmmmmmmmmmmmmmmmmmmmmmkjjjjjjjjjjjjjjhfbaaaaaaac.....",
+    ".......aaaaaabcfjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjihffbaaaaaaad......",
+    "..............aciijjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjhhffbc.............",
+    "..............aabcehiikjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjiihecbaab..............",
+    "...............babcfhikkjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjhhfbbbbb...............",
+    "...................bcccdhijjjjjjjjjjiiiiiiiijjjjjjjjjjjihccccbb...................",
+    "...................baaabfhjjjkkjiijhhfhhhhhhhijiijjjjjjhfbabbb....................",
+    ".......................cbbcccccccccehiiijjjiheccccccccccba........................",
+    "........................bbbaaabbaaadijjjjjkjidaaaaabbbbbb.........................",
+    ".............................gbaaefiklmmlmmllifcaaaaa.............................",
+    "..............................bbdfhjlmmoommmlihedabbb.............................",
+    "...........................ccdfgijklmmmonmmmmlkkjggdbbd...........................",
+    "..........................abbejmmmmmmmmnmmmmmmoooonebaa...........................",
+    ".........................aaceglonmmmmnnnnmmnmmoonnmffcdbd.........................",
+    "........................aafhllmmnnmnnmnnmmnnnnnnnnmllhhcb.........................",
+    "........................aejlllmnnnmmmmnnmnnmnnooommmllkdb.........................",
+    "......................dbbfmlmmmmommmmmmnnmnnnnoommmllmodba........................",
+    "......................bcfloommlmmmmmmnmnnnnnnnnmmmllmoolhba.......................",
+    "......................bcjlonmkjlmmnnnnnnnmnnnmnmmljjmmmlkca.......................",
+    "......................admmmmlijlmmmnnnnnnnnnnnnmmljhhlmllda.......................",
+    "....................cadhllnkhhlmmmnnnooonnnnnnnmmmkhhkmmnhebb.....................",
+    "....................bbhjmoolfhmmmnmnnnononnnnnnmmmmhfkonnkibad....................",
+    "...................bbdklllljfhonmnnmnnnnonnnnnnmmnohfjllmlkedaa...................",
+    "...................bchommkjifioonnnnnnnmnnnnnnnnnoohfiilmlmhfaa...................",
+    "..................dbfhommjihfjonmnnnnnnnnoonoonnnooihfhlmmmkjaa...................",
+    ".................dbckmonohffhjmmmnnnnnnnnoonnnnnnnnihffkonoooaa...................",
+    "................baaclmnooihhijmmmmmmmnnonooonnnoommihfflonoooedba.................",
+    "................aaijllmmldbcklmmmnnmnmooonnnnnmnnnnljbagonoooljaa.................",
+    "................aammlmmkjdacnonmmmmnnnnoonnooomnnnnlkcbgkmmmmllaa.................",
+    "...............bbdoommljhdacmmmmnnnnnnooooonnnmnnnnnocbfjkmmmlmhca................",
+    "..............aaefnonnojhdbcmmmmnnnnmooooooonnnnnmnoocbgiklmmmnhfa................",
+    "..............abiinonnkhebceommmnnnnoooooonnnnnnnnnoodadfiknoookjaa...............",
+    ".............dabiimoonjhabehnommnnnoonoonnnnnmnnnnoomfdbchjooooiiaab..............",
+    "............badflmookjfdadfhmnnnmnnoooonnnnonnonnnnnmhfcafhjklmkkgfaa.............",
+    "...........cbchlmmoojifdaeiimmnnnnnooonnnoooooooonmmlhhdbefhjlmmlmkbbd............",
+    "..........dabcilmmnnmjecbeijmmnnnnnnnnnnoooooooooonmliidbbfhklmmmmkdcbb...........",
+    "..........bbkommmmmmlkfcbflmmmnnmnnnnonnoooooooooonmljjebdhlmmmmmnoljda...........",
+    "..........abooommmllllicafmmmmnnnnnnooooooooooooonnmmkkeaejmomklmmmllda...........",
+    "..........abooommljjommdafmoommmmnnnnnoooooooonnnnnnnmkdaeoooiilmmmmmda...........",
+    "..........acmmmmmmjknmodafmnonmmnmnonoooonnnnnnnnnnnnmleaelmniimmmmnndb...........",
+    "..........bcjllmmmokhiidaflmmnnnmmnmmnoooomnmnnnnnnnmmnebejjfjkonnmjidb...........",
+    "..........bcijllmmmkhhfdbglmmnnnmmmnoooonmmllmnnnnnnmmoebdfifijoonmjidb...........",
+    "..........babchjmmljebabbgmmmmmnnnlkkihhhhhiijlnonnmmmoebbaadkllljjecaa...........",
+    "...........abbfinnlhbbabbgonmmmnookkjhffhhhiijknnnmmmmoeabaaakllkihbbb............",
+    "............daabbbbabc.cbgommmmnnookjcbabbbfiklmmnnnmmmea..dbbbbbaaac.............",
+    "..............bbbbbbd..cbgmmmmmmmnoljcabaabfilnmnnnmmllea....bbaaaa...............",
+    ".......................cagllmnnmmmmkjca..aafjlnoonnmllkeb.........................",
+    ".......................cafikmnoonmljica..aafjlnoooonnlkeb.........................",
+    "........................aeikmnnnnnmihca..bafjloonnnookjdb.........................",
+    "........................aejkonmmnmmjica..bbeilnmmmmmnjhca.........................",
+    "........................beijllmmmlljhcb..baeilmmmmmlkhfda.........................",
+    "........................adfhjkllljjhhca..aaefijlmmmkjhfdb.........................",
+    "........................adhhjjkkkjjhhca..aaefijklllkjihdb.........................",
+    "........................aeiijjjjjjjjica..aaeijjjjjjjjiida.........................",
+    "........................aeiijjjjjjjiica..aaeiijjkjjjjiida.........................",
+    "........................aeijjjjjjjjiica..aaeiijjjjjjjjida.........................",
+    "........................aejjjjjjjjjiica..aaeijjjjjjjjjjdb.........................",
+    "......................cacfiijjjijjjihca..bbfjjjjkjjjjjifcbd.......................",
+    "......................bceffhiiihhhhhhca..bbfjjjhhiiiihffebb.......................",
+    "......................bcfffhiiihhffhhca..bbfjjihfiiiiffffcb.......................",
+    "......................bdilonmlllljiffca..bbehhhlllllllmjicb.......................",
+    ".....................dadnoommmmmmkiffcb..bbeehjonmmmmmnlkcba......................",
+    "....................acfjoommmmmmmmlifbb..bbcfimmnmmmmmmonifca.....................",
+    "....................bcijnnmmmonnmmmihcb..bbehllnnmmmmmmmlihbb.....................",
+    "....................bckllmmnoonnmmokjca..aafilmmmnnomnmlljjcb.....................",
+    "....................bcjklmmnonmmmnolkca..aafjmnmmmnonmmmljjcb.....................",
+    "....................acijkmoonmmmlmokjca..bafijlllmmmnmllkjjcb.....................",
+    "....................abffkkkkjjjjjiiffcb..bbdffhijllkkkkjjffba.....................",
+    "....................bbffjjjiiiijjhhfebb..cbcdfhijkjjiijiiffba.....................",
+    ".....................abbaaaaabbbaaaaab....dbaaabbbaaaabbbbba......................",
+    "......................bbaaabbbbbbaabb......dbbbbbaaabbbbbbb.......................",
+  ] },
+};
+
+// Pixie Closet — pixel compositing engine.
+// Everything is drawn into a CW x CH RGBA buffer. Garments are masks that are
+// shaded from the reference body's own shading, so clothes hug its contours.
+
+const CW = 128, CH = 176, FEET_Y = 166;
+const INK = [45, 11, 6]; // outline brown from the reference
+
+// Landmarks are in each sprite's local pixel coordinates.
+const VIEWS = {
+  front: {
+    cx: 40, headCx: 40, headBottom: 66, torsoTop: 67, chestY: 78, waistY: 92, hipY: 96,
+    crotchY: 101, kneeY: 109, footY: 116, handY: 89, sleeveShort: 80, sleeveLong: 90,
+    torsoL: 25, torsoR: 55, neck: [40, 66], hand: [64, 97], eyes: [[23, 49], [57, 49]],
+    arms: [
+      [[20, 66], [30, 70], [29, 88], [25, 92], [25, 106], [5, 106], [5, 86], [14, 76]],
+      [[60, 66], [50, 70], [51, 88], [55, 92], [55, 106], [75, 106], [75, 86], [66, 76]],
+    ],
+    eyeBoxes: [[14, 38, 32, 60], [48, 38, 66, 60]],
+  },
+  side: {
+    cx: 35, headCx: 35, headBottom: 68, torsoTop: 70, chestY: 80, waistY: 92, hipY: 97,
+    crotchY: 104, kneeY: 111, footY: 119, handY: 92, sleeveShort: 82, sleeveLong: 92,
+    torsoL: 21, torsoR: 50, neck: [31, 69], hand: [43, 99], eyes: [[19, 51]],
+    arms: [[[30, 72], [46, 72], [49, 88], [53, 93], [53, 106], [33, 106], [34, 92], [31, 80]]],
+    eyeBoxes: [[11, 40, 29, 62]],
+  },
+  back: {
+    cx: 40, headCx: 40, headBottom: 66, torsoTop: 67, chestY: 78, waistY: 92, hipY: 96,
+    crotchY: 101, kneeY: 109, footY: 116, handY: 89, sleeveShort: 80, sleeveLong: 90,
+    torsoL: 25, torsoR: 55, neck: [40, 65], hand: [16, 97], eyes: [],
+    arms: [
+      [[20, 66], [30, 70], [29, 88], [25, 92], [25, 106], [5, 106], [5, 86], [14, 76]],
+      [[60, 66], [50, 70], [51, 88], [55, 92], [55, 106], [75, 106], [75, 86], [66, 76]],
+    ],
+    eyeBoxes: [],
+  },
+};
+
+// ---------- colour helpers ----------
+function hexRgb(h) { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); }
+function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+// Ramp: [highlight, base, shade, deep]. Shadows drift toward purple, highlights toward warm white.
+function ramp(hex) {
+  const c = typeof hex === 'string' ? hexRgb(hex) : hex;
+  const hi = mix(c, [255, 250, 240], 0.38);
+  const sh = [c[0] * 0.8, c[1] * 0.74, c[2] * 0.82 + 12].map(clamp);
+  const dp = [c[0] * 0.6, c[1] * 0.52, c[2] * 0.66 + 16].map(clamp);
+  return [hi, c.slice(), sh, dp];
+}
+function lineColor(r) { return mix(r[3], INK, 0.62); }
+
+// ---------- body ----------
+const BODY = {};
+const PAL = BODY_PALETTE.map(hexRgb);
+const SKIN_BASE = hexRgb('#fde6d4');
+for (const name of ['front', 'side', 'back']) {
+  const s = BODY_SPRITES[name], V = VIEWS[name];
+  const idx = new Int8Array(s.w * s.h);
+  s.rows.forEach((row, y) => { for (let x = 0; x < s.w; x++) idx[y * s.w + x] = row[x] === '.' ? -1 : row.charCodeAt(x) - 97; });
+  V.w = s.w; V.h = s.h; V.ox = 64 - V.cx; V.oy = FEET_Y - s.h;
+  BODY[name] = idx;
+}
+function pointInPoly(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// Body part per local pixel, computed once.
+const PARTS = {};
+for (const name of ['front', 'side', 'back']) {
+  const V = VIEWS[name], idx = BODY[name], p = new Array(V.w * V.h).fill(null);
+  for (let y = 0; y < V.h; y++) for (let x = 0; x < V.w; x++) {
+    if (idx[y * V.w + x] < 0) continue;
+    let part;
+    if (y <= V.headBottom) part = 'head';
+    else if (V.arms.some(a => pointInPoly(x + .5, y + .5, a))) part = y >= V.handY ? 'hand' : 'arm';
+    else if (y >= V.footY) part = 'foot';
+    else if (y >= V.crotchY) part = 'leg';
+    else part = 'torso';
+    p[y * V.w + x] = part;
+  }
+  PARTS[name] = p;
+}
+
+const SKIN_TONES = [
+  { name: 'Porcelain', hex: '#fde6d4' }, { name: 'Peach', hex: '#f8d2b4' },
+  { name: 'Honey', hex: '#e8b48f' }, { name: 'Caramel', hex: '#c98d65' },
+  { name: 'Cocoa', hex: '#9a6446' }, { name: 'Ebony', hex: '#6e432e' },
+  { name: 'Lilac Elf', hex: '#e6d6f6' }, { name: 'Mint Sprite', hex: '#cfeedd' },
+];
+const EYE_COLORS = [
+  { name: 'Cocoa', c: ['#5c3228', '#7c5246', '#a47364'] },
+  { name: 'Sky', c: ['#1f3f7a', '#3d74c9', '#86b6ee'] },
+  { name: 'Leaf', c: ['#1f5132', '#3a8a55', '#86cf8f'] },
+  { name: 'Violet', c: ['#3e2470', '#6a46b8', '#a98be6'] },
+  { name: 'Ruby', c: ['#6b1626', '#b53246', '#ec7e8c'] },
+  { name: 'Amber', c: ['#6a3c0e', '#b9761c', '#efbd5b'] },
+  { name: 'Rose', c: ['#7a2856', '#cc5a92', '#f6a3c8'] },
+  { name: 'Ash', c: ['#2c3038', '#5d6574', '#a5acb8'] },
+];
+
+// ---------- masks ----------
+class Mask {
+  constructor(V) { this.V = V; this.a = new Uint8Array(CW * CH); }
+  i(x, y) { x = Math.round(x) + this.V.ox; y = Math.round(y) + this.V.oy; return (x < 0 || y < 0 || x >= CW || y >= CH) ? -1 : y * CW + x; }
+  set(x, y) { const i = this.i(x, y); if (i >= 0) this.a[i] = 1; return this; }
+  has(x, y) { const i = this.i(x, y); return i >= 0 && this.a[i] === 1; }
+  each(fn) { const { ox, oy } = this.V; for (let i = 0; i < this.a.length; i++) if (this.a[i]) fn(i % CW - ox, (i / CW | 0) - oy, i); }
+  rect(x0, y0, x1, y1) { for (let y = Math.round(y0); y <= y1; y++) for (let x = Math.round(x0); x <= x1; x++) this.set(x, y); return this; }
+  ellipse(cx, cy, rx, ry) {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+      const dx = (x - cx) / (rx + .35), dy = (y - cy) / (ry + .35); if (dx * dx + dy * dy <= 1) this.set(x, y);
+    }
+    return this;
+  }
+  poly(pts) {
+    const ys = pts.map(p => p[1]), xs = pts.map(p => p[0]);
+    for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++)
+      for (let x = Math.floor(Math.min(...xs)); x <= Math.ceil(Math.max(...xs)); x++)
+        if (pointInPoly(x + .5, y + .5, pts)) this.set(x, y);
+    return this;
+  }
+  line(x0, y0, x1, y1, w = 1) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1) * 2;
+    for (let s = 0; s <= n; s++) {
+      const x = x0 + (x1 - x0) * s / n, y = y0 + (y1 - y0) * s / n;
+      if (w <= 1) this.set(x, y); else this.ellipse(x, y, (w - 1) / 2, (w - 1) / 2);
+    }
+    return this;
+  }
+  add(m) { for (let i = 0; i < this.a.length; i++) if (m.a[i]) this.a[i] = 1; return this; }
+  sub(m) { for (let i = 0; i < this.a.length; i++) if (m.a[i]) this.a[i] = 0; return this; }
+  and(m) { for (let i = 0; i < this.a.length; i++) if (!m.a[i]) this.a[i] = 0; return this; }
+  keep(fn) { this.each((x, y, i) => { if (!fn(x, y)) this.a[i] = 0; }); return this; }
+  clone() { const m = new Mask(this.V); m.a.set(this.a); return m; }
+  dilate(n = 1) {
+    for (let k = 0; k < n; k++) {
+      const b = this.a.slice();
+      for (let i = 0; i < b.length; i++) if (b[i]) {
+        const x = i % CW; if (x > 0) this.a[i - 1] = 1; if (x < CW - 1) this.a[i + 1] = 1;
+        if (i >= CW) this.a[i - CW] = 1; if (i < b.length - CW) this.a[i + CW] = 1;
+      }
+    }
+    return this;
+  }
+  mirror() { // mirror around the view centre line (cx), used by symmetric front/back shapes
+    const m = new Mask(this.V), c2 = this.V.cx * 2; this.each((x, y) => m.set(c2 - x, y)); return this.add(m);
+  }
+  empty() { return !this.a.some(v => v); }
+}
+
+// ---------- renderer ----------
+class Renderer {
+  constructor(view, state, opts = {}) {
+    this.view = view; this.V = VIEWS[view]; this.state = state;
+    this.buf = new Uint8ClampedArray(CW * CH * 4);
+    this.blink = !!opts.blink;
+  }
+  M() { return new Mask(this.V); }
+  bodyIdx(x, y) { const V = this.V; return (x < 0 || y < 0 || x >= V.w || y >= V.h) ? -1 : BODY[this.view][y * V.w + x]; }
+  part(x, y) { const V = this.V; return (x < 0 || y < 0 || x >= V.w || y >= V.h) ? null : PARTS[this.view][y * V.w + x]; }
+  body(pred) { // mask of body pixels whose part/pos satisfies pred
+    const m = this.M(), V = this.V;
+    for (let y = 0; y < V.h; y++) for (let x = 0; x < V.w; x++) { const p = this.part(x, y); if (p && pred(x, y, p)) m.set(x, y); }
+    return m;
+  }
+  put(i, c, a = 255) {
+    const o = i * 4;
+    if (a >= 255) { this.buf[o] = c[0]; this.buf[o + 1] = c[1]; this.buf[o + 2] = c[2]; this.buf[o + 3] = 255; return; }
+    const t = a / 255, ba = this.buf[o + 3] / 255, na = t + ba * (1 - t);
+    for (let k = 0; k < 3; k++) this.buf[o + k] = (c[k] * t + this.buf[o + k] * ba * (1 - t)) / (na || 1);
+    this.buf[o + 3] = na * 255;
+  }
+
+  drawBody() {
+    const V = this.V, st = this.state;
+    const skin = hexRgb(SKIN_TONES[st.skin]?.hex || SKIN_TONES[0].hex);
+    const ratio = skin.map((v, k) => v / SKIN_BASE[k]);
+    const eye = EYE_COLORS[st.eyes] || EYE_COLORS[0];
+    const eyeC = eye.c.map(hexRgb);
+    const inEye = (x, y) => V.eyeBoxes.some(b => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]);
+    for (let y = 0; y < V.h; y++) for (let x = 0; x < V.w; x++) {
+      let k = this.bodyIdx(x, y); if (k < 0) continue;
+      const i = (y + V.oy) * CW + x + V.ox;
+      let c;
+      if (inEye(x, y) && k >= 2 && k <= 4) c = eyeC[k - 2];
+      else if (k <= 1) c = PAL[k];
+      else if (k <= 4) c = PAL[k];
+      else c = PAL[k].map((v, j) => clamp(v * ratio[j]));
+      this.put(i, c);
+    }
+    if (this.blink && V.eyeBoxes.length) this.drawBlink(skin, ratio);
+  }
+  drawBlink(skin, ratio) {
+    const V = this.V, lid = PAL[13].map((v, j) => clamp(v * ratio[j]));
+    const lidSh = PAL[9].map((v, j) => clamp(v * ratio[j]));
+    for (const b of V.eyeBoxes) {
+      const m = this.M();
+      for (let y = b[1]; y <= b[3]; y++) for (let x = b[0]; x <= b[2]; x++) {
+        const k = this.bodyIdx(x, y); if (k < 0) continue;
+        if (k <= 4 || k === 15 || k === 6) m.set(x, y);
+      }
+      // keep the face outline (head silhouette) intact in side view
+      m.keep((x, y) => this.bodyIdx(x - 1, y) >= 0 && this.bodyIdx(x + 1, y) >= 0);
+      m.each((x, y, i) => this.put(i, y > (b[1] + b[3]) / 2 + 3 ? lidSh : lid));
+      const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2 + 3, hw = (b[2] - b[0]) / 2 - 2;
+      const L = this.M();
+      for (let x = Math.round(cx - hw); x <= Math.round(cx + hw); x++) {
+        const t = (x - cx) / hw; L.set(x, Math.round(cy + 1 - 2 * t * t)); L.set(x, Math.round(cy - 2 * t * t));
+      }
+      L.each((x, y, i) => this.put(i, PAL[0]));
+    }
+  }
+
+  // Paint a mask with a colour ramp.
+  //  opts.lines  — keep the body's own dark contour lines inside the mask (arm/torso seams, leg gap)
+  //  opts.pattern(x,y) -> truthy: use opts.alt ramp for that pixel
+  //  opts.flat   — skip body-based shading
+  //  opts.noOutline, opts.alpha
+  paint(mask, r, opts = {}) {
+    if (mask.empty()) return;
+    const D = new Uint8Array(CW * CH), a = mask.a;
+    for (let i = 0; i < a.length; i++) if (a[i]) {
+      const x = i % CW;
+      if (x === 0 || x === CW - 1 || !a[i - 1] || !a[i + 1] || !a[i - CW] || !a[i + CW]) D[i] = 1;
+    }
+    for (let d = 2; d <= 3; d++) for (let i = 0; i < a.length; i++) if (a[i] && !D[i]) {
+      if (D[i - 1] === d - 1 || D[i + 1] === d - 1 || D[i - CW] === d - 1 || D[i + CW] === d - 1) D[i] = d;
+    }
+    const out = opts.outline || lineColor(r);
+    const has = (x, y) => mask.has(x, y);
+    mask.each((x, y, i) => {
+      const d = D[i] || 4;
+      let c;
+      if (d === 1 && !opts.noOutline) c = out;
+      else {
+        const k = this.bodyIdx(x, y);
+        const R = opts.pattern && opts.pattern(x, y) ? (opts.alt || r) : r;
+        if (opts.lines && k >= 0 && k <= 2) c = out;
+        else {
+          let tone;
+          if (k >= 5 && !opts.flat && (!opts.headOnly || this.part(x, y) === 'head')) tone = k === 15 ? 0 : k === 5 ? 3 : k <= 8 ? 2 : 1;
+          else {
+            tone = 1;
+            if (!has(x + 2, y) || !has(x, y + 2)) tone = 2;
+            if (d === 2 && (!has(x + 1, y) || !has(x, y + 1) || !has(x + 2, y) || !has(x, y + 2))) tone = 3;
+            else if (d >= 3 && !has(x - 3, y) && has(x + 3, y) && !has(x, y - 3)) tone = 0;
+          }
+          c = R[tone];
+        }
+      }
+      this.put(i, c, opts.alpha ?? 255);
+    });
+  }
+  // solid fill (details: buttons, gems, laces)
+  fill(mask, c, alpha) { mask.each((x, y, i) => this.put(i, typeof c === 'string' ? hexRgb(c) : c, alpha)); }
+  outline(mask, c = INK) { // 1px outline around the outside of a mask
+    const o = mask.clone().dilate(1).sub(mask); this.fill(o, c);
+  }
+}
+
+// Render the full character for a view. Items come from ITEMS (items.js).
+const BEHIND_ORDER = ['back', 'hair', 'hand'];
+const FRONT_ORDER = ['shoes', 'top:inner', 'bottom', 'top:outer', 'dress', 'back', 'face', 'hair', 'hat', 'hand'];
+function renderCharacter(view, state, opts = {}) {
+  const R = new Renderer(view, state, opts);
+  const call = (slot, phase) => {
+    const [cat, sub] = slot.split(':');
+    const sel = state.equip[cat]; if (!sel || !sel.id) return;
+    const item = ITEM_BY_ID[sel.id]; if (!item) return;
+    if (sub && (item.layer || 'inner') !== sub) return;
+    item.draw(R, phase, ramp(sel.color || item.dye || '#999999'), sel.color || item.dye);
+  };
+  if (!opts.only) {
+    for (const slot of BEHIND_ORDER) call(slot, 'back');
+    R.drawBody();
+    for (const slot of FRONT_ORDER) call(slot, 'front');
+  } else {
+    const item = ITEM_BY_ID[opts.only.id];
+    item.draw(R, 'back', ramp(opts.only.color || item.dye || '#999'), opts.only.color || item.dye);
+    if (opts.withBody) R.drawBody();
+    item.draw(R, 'front', ramp(opts.only.color || item.dye || '#999'), opts.only.color || item.dye);
+  }
+  return R.buf;
+}
+
+// Pixie Closet — wardrobe. Every item draws itself for front / side / back views.
+// draw(R, phase, ramp, hex): phase 'back' = behind the body, 'front' = over it.
+
+const ITEMS = [];
+const ITEM_BY_ID = {};
+function item(cat, id, name, dye, draw, extra = {}) {
+  const it = { cat, id, name, dye, draw, ...extra };
+  ITEMS.push(it); ITEM_BY_ID[id] = it; return it;
+}
+const WHITE = ramp('#f7f3f8'), GOLD = ramp('#f2c14e'), SILVER = ramp('#c9cfdc'), BLACK = ramp('#34303d');
+const WOOD = ramp('#9a6a43'), RED = ramp('#e0475a'), PINK = ramp('#f7a8c4'), GREEN = ramp('#5bb36a');
+const tri = (x, P, A) => A * (1 - Math.abs((((x % P) + P) % P) - P / 2) / (P / 2)); // triangle wave 0..A
+const isSide = R => R.view === 'side', isBack = R => R.view === 'back', isFront = R => R.view === 'front';
+// mirror an x coordinate for the character's own left/right in the back view
+const mx = (R, x) => isBack(R) ? R.V.cx * 2 - x : x;
+
+// ---------------- clothing helpers ----------------
+function neckCut(R, type) {
+  const V = R.V, [nx, ny] = V.neck, m = R.M();
+  if (type === 'high') return m;
+  if (isBack(R)) return type === 'wide' ? m.ellipse(nx, ny, 11, 3) : m.ellipse(nx, ny, 6, 2);
+  if (isSide(R)) return type === 'wide' ? m.ellipse(nx + 2, ny, 9, 4) : m.ellipse(nx - 1, ny, 5, 3);
+  if (type === 'v') return m.poly([[nx - 7, ny - 1], [nx + 8, ny - 1], [nx + .5, ny + 10]]);
+  if (type === 'wide') return m.ellipse(nx, ny, 12, 4);
+  if (type === 'sweet') return m.ellipse(nx, ny, 9, 3);
+  return m.ellipse(nx, ny, 6, 3);
+}
+function shirtMask(R, { sleeve = 'short', hem, neck = 'round' } = {}) {
+  const V = R.V; hem = hem ?? V.waistY + 4;
+  const sl = sleeve === 'long' ? V.handY - 1 : sleeve === 'short' || sleeve === 'puff' ? V.sleeveShort : -1;
+  const m = R.body((x, y, p) => (p === 'torso' && y <= hem) || (p === 'arm' && y <= sl));
+  m.sub(neckCut(R, neck));
+  if (sleeve === 'puff') m.add(puffs(R));
+  if (neck === 'high') m.add(collarHigh(R));
+  return m;
+}
+function puffs(R) {
+  const V = R.V, m = R.M();
+  if (isSide(R)) return m.ellipse(39, 76, 8, 6);
+  return m.ellipse(V.cx - 18, 73, 8, 6).mirror();
+}
+function collarHigh(R) {
+  const [nx, ny] = R.V.neck, m = R.M();
+  if (isSide(R)) return m.rect(nx - 6, ny - 4, nx + 8, ny + 2);
+  return m.rect(nx - 9, ny - 3, nx + 9, ny + 2);
+}
+function pantsMask(R, endY, waist) {
+  const V = R.V; waist = waist ?? V.waistY;
+  return R.body((x, y, p) => (p === 'torso' && y >= waist) || (p === 'leg' && y <= endY) || (p === 'foot' && y <= endY));
+}
+function handMask(R) { return R.body((x, y, p) => p === 'hand' || p === 'arm'); }
+function skirtMask(R, y0, y1, flare, jag = 0, jagP = 6) {
+  const V = R.V, L = V.torsoL, Rr = V.torsoR, m = R.M();
+  m.poly([[L, y0], [Rr, y0], [Rr + flare, y1], [L - flare, y1]]);
+  if (jag) m.keep((x, y) => y < y1 - tri(x - V.cx, jagP, jag) + 1);
+  return m.sub(handMask(R));
+}
+function waistBand(R, y, h, color) {
+  const V = R.V, m = R.body((x, yy, p) => p === 'torso' && yy >= y && yy < y + h);
+  R.paint(m, color, { lines: true, flat: true });
+}
+function buttons(R, ys, c = '#f2c14e', dx = 0) {
+  if (!isFront(R)) return;
+  const m = R.M(); ys.forEach(y => m.rect(R.V.cx + dx, y, R.V.cx + dx + 1, y + 1)); R.fill(m, c);
+}
+const stripes = (P = 4, on = 2) => (x, y) => ((y % P) + P) % P < on;
+const dots = (x, y) => (x % 6 === 2 && y % 6 === 2) || (x % 6 === 5 && y % 6 === 5);
+const plaid = (x, y) => (x % 6 < 2) !== (y % 6 < 2);
+const checker = (x, y) => ((x >> 2) + (y >> 2)) % 2 === 0;
+
+// ---------------- TOPS ----------------
+function simpleTop(id, name, dye, cfg, deco, extra = {}) {
+  return item('top', id, name, dye, (R, ph, r, hex) => {
+    if (cfg.behind && ph === 'back') return cfg.behind(R, r);
+    if (ph !== 'front') return;
+    const m = shirtMask(R, cfg);
+    R.paint(m, r, { lines: true, pattern: cfg.pattern, alt: cfg.alt ? cfg.alt(r) : WHITE });
+    deco && deco(R, r, m, hex);
+  }, extra);
+}
+simpleTop('tee', 'Comfy Tee', '#8cc8f2', { sleeve: 'short' }, (R, r) => {
+  if (!isFront(R)) return; const m = R.M().ellipse(R.V.cx + 6, 82, 3, 3); R.paint(m, ramp('#fff3a6'));
+});
+simpleTop('tank', 'Tank Top', '#f5d04a', { sleeve: 'none', neck: 'wide' });
+simpleTop('stripe', 'Marine Stripe', '#3f6fd8', { sleeve: 'short', pattern: stripes(4, 2) });
+simpleTop('crop', 'Crop Top', '#f7a8c4', { sleeve: 'short', hem: 84, neck: 'sweet' });
+simpleTop('turtle', 'Turtleneck', '#b9a0ef', { sleeve: 'long', neck: 'high', hem: 95 });
+simpleTop('sweater', 'Cozy Knit', '#f08a3c', { sleeve: 'long', hem: 98, pattern: (x, y) => x % 3 === 0 && y % 2 === 0, alt: r => [r[2], r[2], r[3], r[3]] }, (R, r) => {
+  const V = R.V, m = R.body((x, y, p) => (p === 'torso' && y >= 95 && y <= 98) || (p === 'arm' && y >= V.handY - 3 && y < V.handY));
+  R.paint(m, ramp(r[2]), { lines: true, pattern: x => x % 2 === 0, alt: ramp(r[3]) });
+}, { layer: 'outer' });
+simpleTop('hoodie', 'Hoodie', '#7a8fa8', {
+  sleeve: 'long', hem: 99,
+  behind: (R, r) => { if (isSide(R)) R.paint(R.M().ellipse(44, 70, 7, 6), r); },
+}, (R, r) => {
+  const V = R.V, [nx, ny] = V.neck;
+  if (isBack(R)) R.paint(R.M().poly([[nx - 13, ny - 1], [nx + 13, ny - 1], [nx + 9, ny + 15], [nx - 9, ny + 15]]), r);
+  else if (isFront(R)) {
+    const hood = R.M().ellipse(nx, ny + 1, 14, 4).sub(R.M().ellipse(nx, ny + 1, 7, 2)); R.paint(hood, r);
+    const s = R.M().rect(nx - 4, ny + 4, nx - 4, ny + 11).rect(nx + 4, ny + 4, nx + 4, ny + 11); R.fill(s, '#f7f3f8');
+    R.paint(R.M().rect(nx - 9, 89, nx + 9, 96), ramp(r[2]));
+  }
+  const cuffs = R.body((x, y, p) => (p === 'torso' && y >= 97 && y <= 99) || (p === 'arm' && y >= V.handY - 3));
+  R.paint(cuffs, ramp(r[2]), { lines: true });
+}, { layer: 'outer' });
+simpleTop('sailor', 'Sailor Blouse', '#f7f3f8', { sleeve: 'puff' }, (R) => {
+  const V = R.V, [nx, ny] = V.neck, navy = ramp('#2c3a6b');
+  if (isFront(R)) {
+    R.paint(R.M().poly([[nx - 13, ny - 1], [nx + 13, ny - 1], [nx + 6, ny + 9], [nx, ny + 13], [nx - 6, ny + 9]]), navy);
+    R.fill(R.M().line(nx - 10, ny + 1, nx - 1, ny + 10).line(nx + 10, ny + 1, nx + 1, ny + 10), '#f7f3f8');
+    const bow = R.M().poly([[nx - 6, ny + 9], [nx, ny + 12], [nx - 6, ny + 15]]).poly([[nx + 6, ny + 9], [nx, ny + 12], [nx + 6, ny + 15]]).ellipse(nx, ny + 12, 1, 1);
+    R.paint(bow, RED);
+  } else if (isBack(R)) {
+    R.paint(R.M().rect(nx - 13, ny, nx + 13, ny + 11), navy);
+    R.fill(R.M().rect(nx - 10, ny + 8, nx + 10, ny + 8), '#f7f3f8');
+  } else R.paint(R.M().rect(nx + 4, ny, nx + 14, ny + 9), navy);
+});
+simpleTop('shirt', 'Button-Up', '#f7f3f8', { sleeve: 'short', neck: 'v' }, (R, r) => {
+  const [nx, ny] = R.V.neck;
+  if (isFront(R)) {
+    R.paint(R.M().poly([[nx - 8, ny - 2], [nx - 1, ny + 2], [nx - 7, ny + 6]]).poly([[nx + 9, ny - 2], [nx + 2, ny + 2], [nx + 8, ny + 6]]), r);
+    const tie = R.M().poly([[nx - 1, ny + 2], [nx + 2, ny + 2], [nx + 3, ny + 16], [nx + .5, ny + 19], [nx - 2, ny + 16]]);
+    R.paint(tie, ramp('#e0475a'));
+  }
+});
+simpleTop('jacket', 'Denim Jacket', '#4d74b8', { sleeve: 'long', hem: 98 }, (R, r) => {
+  const V = R.V, [nx, ny] = V.neck;
+  if (isFront(R)) {
+    const inner = R.M().poly([[nx - 6, ny - 1], [nx + 7, ny - 1], [nx + 5, 98], [nx - 4, 98]]).and(R.body(() => true));
+    R.paint(inner, ramp('#f7f3f8'), { lines: true, pattern: stripes(4, 1), alt: ramp('#e0475a') });
+    R.paint(R.M().poly([[nx - 9, ny - 1], [nx - 5, ny - 1], [nx - 3, ny + 12]]).poly([[nx + 10, ny - 1], [nx + 6, ny - 1], [nx + 4, ny + 12]]), ramp(r[2]));
+    R.paint(R.M().rect(V.cx - 13, 80, V.cx - 9, 83).rect(V.cx + 9, 80, V.cx + 13, 83), ramp(r[2]));
+  }
+  const cuffs = R.body((x, y, p) => p === 'arm' && y >= V.handY - 3);
+  R.paint(cuffs, ramp(r[2]), { lines: true });
+}, { layer: 'outer' });
+simpleTop('armor', 'Knight Plate', '#c9cfdc', { sleeve: 'short', hem: 97, neck: 'high', pattern: (x, y) => y % 7 === 0, alt: r => [r[2], r[2], r[3], r[3]] }, (R, r) => {
+  const V = R.V;
+  if (isSide(R)) R.paint(R.M().ellipse(40, 74, 9, 6), r);
+  else R.paint(R.M().ellipse(V.cx - 19, 72, 9, 6).mirror(), r);
+  if (isFront(R)) { R.paint(R.M().poly([[V.cx - 4, 76], [V.cx + 5, 76], [V.cx + 5, 84], [V.cx + .5, 88], [V.cx - 4, 84]]), ramp('#e0475a')); }
+  waistBand(R, 93, 3, ramp('#8a5a3c'));
+}, { layer: 'outer' });
+simpleTop('maple', 'Maple Tee', '#f7f3f8', { sleeve: 'short' }, (R) => {
+  if (!isFront(R)) return; const c = R.V.cx, y = 80;
+  const leaf = R.M().poly([[c, y - 5], [c + 2, y - 1], [c + 6, y - 2], [c + 4, y + 2], [c + 6, y + 5], [c + 1, y + 4], [c, y + 7], [c - 1, y + 4], [c - 6, y + 5], [c - 4, y + 2], [c - 6, y - 2], [c - 2, y - 1]]);
+  R.paint(leaf, ramp('#f08a3c'));
+});
+simpleTop('tunic', 'Ranger Tunic', '#4f8f52', { sleeve: 'long', hem: 100, neck: 'v' }, (R, r) => {
+  waistBand(R, 91, 3, ramp('#8a5a3c'));
+  if (isFront(R)) R.fill(R.M().rect(R.V.cx - 1, 91, R.V.cx + 1, 93), '#f2c14e');
+}, { layer: 'outer' });
+
+// ---------------- BOTTOMS ----------------
+item('bottom', 'jeans', 'Classic Jeans', '#4d74b8', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(pantsMask(R, V.footY - 1), r, { lines: true });
+  waistBand(R, V.waistY, 2, ramp(r[2]));
+  if (isFront(R)) R.fill(R.M().rect(V.cx, V.waistY, V.cx, V.waistY + 1), '#f2c14e');
+});
+item('bottom', 'shorts', 'Play Shorts', '#f5d04a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(pantsMask(R, V.crotchY + 6), r, { lines: true });
+  waistBand(R, V.waistY, 2, ramp(r[2]));
+});
+item('bottom', 'joggers', 'Joggers', '#8b8fa3', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(pantsMask(R, V.footY - 1), r, { lines: true });
+  R.paint(R.body((x, y, p) => (p === 'leg' || p === 'foot') && y >= V.footY - 3 && y < V.footY), ramp(r[2]), { lines: true });
+  R.paint(R.body((x, y, p) => p === 'leg' && (x === V.torsoL + 1 || x === V.torsoR - 2) && y < V.footY - 3), WHITE, { noOutline: true });
+});
+item('bottom', 'cargo', 'Cargo Shorts', '#a8946a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(pantsMask(R, V.kneeY), r, { lines: true });
+  if (!isSide(R)) R.paint(R.M().rect(V.torsoL + 1, 101, V.torsoL + 6, 106).rect(V.torsoR - 7, 101, V.torsoR - 2, 106), ramp(r[2]));
+  else R.paint(R.M().rect(30, 101, 37, 107), ramp(r[2]));
+});
+item('bottom', 'pleated', 'Pleated Skirt', '#e0475a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(skirtMask(R, V.waistY, V.crotchY + 8, 6), r, { flat: true, pattern: (x) => (x - V.cx) % 4 === 0, alt: ramp(r[2]) });
+  waistBand(R, V.waistY, 2, ramp(r[2]));
+});
+item('bottom', 'plaid', 'Plaid Skirt', '#2c6b4f', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(skirtMask(R, V.waistY, V.crotchY + 7, 5), r, { flat: true, pattern: plaid, alt: ramp(mix(r[1], [240, 200, 80], .55)) });
+});
+item('bottom', 'tutu', 'Ballet Tutu', '#f7a8c4', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(skirtMask(R, V.waistY, V.crotchY + 4, 12, 3, 5), r, { flat: true, pattern: dots, alt: WHITE });
+  R.paint(R.body((x, y, p) => p === 'torso' && y >= V.waistY - 4 && y < V.waistY), r, { lines: true });
+});
+item('bottom', 'overalls', 'Overalls', '#6b8fd0', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V, c = V.cx;
+  R.paint(pantsMask(R, V.footY - 2), r, { lines: true });
+  if (isFront(R)) {
+    R.paint(R.M().rect(c - 8, 79, c + 8, V.waistY + 1).and(R.body(() => true)), r, { lines: true });
+    R.paint(R.M().line(c - 7, 79, c - 11, 68, 2).line(c + 7, 79, c + 11, 68, 2), ramp(r[2]));
+    R.fill(R.M().rect(c - 7, 81, c - 6, 82).rect(c + 6, 81, c + 7, 82), '#f2c14e');
+    R.paint(R.M().rect(c - 4, 84, c + 4, 89), ramp(r[2]));
+  } else if (isBack(R)) {
+    R.paint(R.M().line(c - 10, 68, c + 6, V.waistY, 2).line(c + 10, 68, c - 6, V.waistY, 2), ramp(r[2]));
+  } else R.paint(R.M().line(26, 70, 24, V.waistY, 2), ramp(r[2]));
+});
+item('bottom', 'maxi', 'Long Skirt', '#b9a0ef', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(skirtMask(R, V.waistY, V.footY + 2, 9), r, { flat: true, pattern: (x, y) => y > V.footY - 4, alt: ramp(r[2]) });
+  waistBand(R, V.waistY, 2, ramp(r[2]));
+});
+item('bottom', 'bloomer', 'Pumpkin Shorts', '#f08a3c', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  const m = pantsMask(R, V.crotchY + 5).add(skirtMask(R, V.waistY + 2, V.crotchY + 5, 4, 2, 6));
+  R.paint(m, r, { flat: true, pattern: (x) => (x - V.cx) % 5 === 0, alt: ramp(r[2]) });
+});
+
+// ---------------- DRESSES (replace top + bottom) ----------------
+function dress(id, name, dye, cfg, deco) {
+  return item('dress', id, name, dye, (R, ph, r, hex) => {
+    if (ph === 'back') return cfg.behind && cfg.behind(R, r);
+    const V = R.V;
+    const body = shirtMask(R, { sleeve: cfg.sleeve, hem: V.crotchY - 1, neck: cfg.neck });
+    if (cfg.legs) body.add(pantsMask(R, V.footY - 1));
+    R.paint(body, r, { lines: true, pattern: cfg.pattern, alt: cfg.alt || WHITE });
+    if (cfg.skirt) {
+      const [y1, flare, jag] = cfg.skirt;
+      R.paint(skirtMask(R, V.waistY - 1, y1 === 'feet' ? V.footY + 3 : y1, flare, jag || 0), r, { flat: true, pattern: cfg.pattern, alt: cfg.alt || WHITE });
+    }
+    deco && deco(R, r, hex);
+  });
+}
+dress('sundress', 'Sundress', '#f5d04a', { sleeve: 'none', neck: 'wide', skirt: [108, 7], pattern: dots }, (R) => {
+  const V = R.V;
+  if (!isSide(R)) R.paint(R.M().line(V.cx - 9, 72, V.cx - 12, 66, 2).line(V.cx + 9, 72, V.cx + 12, 66, 2), ramp('#f5d04a'));
+});
+dress('gown', 'Royal Gown', '#f49ac1', { sleeve: 'puff', neck: 'sweet', skirt: ['feet', 16] }, (R, r) => {
+  const V = R.V;
+  R.paint(skirtMask(R, V.footY - 4, V.footY + 3, 16, 3, 6), ramp(r[0]), { flat: true });
+  R.paint(skirtMask(R, 104, 107, 9, 2, 6).keep((x, y) => y >= 104), ramp(r[0]), { flat: true });
+  waistBand(R, V.waistY - 2, 3, GOLD);
+  if (isFront(R)) R.paint(R.M().ellipse(V.cx, 75, 2, 2), ramp('#8cc8f2'));
+});
+dress('maid', 'Café Maid', '#34303d', { sleeve: 'puff', neck: 'round', skirt: [108, 8, 2] }, (R) => {
+  const V = R.V, [nx, ny] = V.neck;
+  if (isFront(R)) {
+    R.paint(R.M().poly([[V.cx - 9, V.waistY], [V.cx + 9, V.waistY], [V.cx + 12, 106], [V.cx - 12, 106]]).keep((x, y) => y < 106 - tri(x, 4, 2)), WHITE, { flat: true });
+    R.paint(R.M().ellipse(nx, ny + 1, 8, 3), WHITE);
+    R.paint(R.M().poly([[nx - 5, ny + 2], [nx, ny + 5], [nx - 5, ny + 8]]).poly([[nx + 5, ny + 2], [nx, ny + 5], [nx + 5, ny + 8]]), RED);
+  } else if (isBack(R)) {
+    R.paint(R.M().poly([[V.cx - 2, V.waistY], [V.cx - 10, V.waistY + 8], [V.cx - 6, V.waistY + 10]]).poly([[V.cx + 2, V.waistY], [V.cx + 10, V.waistY + 8], [V.cx + 6, V.waistY + 10]]).rect(V.cx - 13, V.waistY - 1, V.cx + 13, V.waistY + 1), WHITE);
+  }
+});
+dress('witch', 'Witch Robe', '#5b3d8f', { sleeve: 'long', neck: 'v', skirt: ['feet', 8, 3], pattern: (x, y) => (x * 7 + y * 13) % 41 === 0, alt: GOLD }, (R) => {
+  waistBand(R, R.V.waistY - 1, 3, GOLD);
+});
+dress('yukata', 'Summer Yukata', '#8cc8f2', { sleeve: 'long', neck: 'v', skirt: [124, 3], pattern: (x, y) => (x + y * 3) % 11 === 0 || (x * 3 - y) % 13 === 0, alt: WHITE }, (R, r) => {
+  const V = R.V;
+  waistBand(R, V.waistY - 4, 6, ramp('#e0475a'));
+  if (isBack(R)) R.paint(R.M().poly([[V.cx - 10, V.waistY - 6], [V.cx + 10, V.waistY - 6], [V.cx + 6, V.waistY + 4], [V.cx - 6, V.waistY + 4]]), ramp('#e0475a'));
+  if (!isSide(R)) R.paint(R.M().poly([[V.cx - 30, 80], [V.cx - 22, 78], [V.cx - 20, 92], [V.cx - 30, 94]]).mirror().sub(R.body((x, y, p) => p === 'hand')), r, { flat: true });
+});
+dress('magical', 'Magical Girl', '#f7f3f8', { sleeve: 'puff', neck: 'sweet', skirt: [104, 13, 3] }, (R) => {
+  const V = R.V, pk = ramp('#f7a8c4');
+  R.paint(skirtMask(R, 101, 104, 13, 3).keep((x, y) => y >= 100), pk, { flat: true });
+  waistBand(R, V.waistY - 1, 3, pk);
+  if (isFront(R)) {
+    const bow = R.M().poly([[V.cx, 76], [V.cx - 9, 71], [V.cx - 9, 81]]).poly([[V.cx, 76], [V.cx + 9, 71], [V.cx + 9, 81]]);
+    R.paint(bow, RED); R.paint(R.M().ellipse(V.cx, 76, 2, 2), GOLD);
+  } else if (isBack(R)) {
+    R.paint(R.M().poly([[V.cx, V.waistY], [V.cx - 11, V.waistY - 6], [V.cx - 11, V.waistY + 6]]).poly([[V.cx, V.waistY], [V.cx + 11, V.waistY - 6], [V.cx + 11, V.waistY + 6]]), pk);
+  }
+});
+dress('onesie', 'Kitty Onesie', '#b8b0c8', {
+  sleeve: 'long', neck: 'round', legs: true, pattern: dots, alt: WHITE,
+  behind: (R, r) => {
+    const V = R.V;
+    if (isSide(R)) R.paint(R.M().line(48, 98, 60, 92, 3).line(60, 92, 64, 80, 3), r);
+    else if (isFront(R)) R.paint(R.M().line(V.cx + 20, 98, V.cx + 30, 92, 3).line(V.cx + 30, 92, V.cx + 32, 80, 3), r);
+  },
+}, (R, r) => {
+  const V = R.V;
+  if (isBack(R)) R.paint(R.M().line(V.cx, 98, V.cx + 8, 92, 3).line(V.cx + 8, 92, V.cx + 10, 80, 3), r);
+  if (isFront(R)) R.paint(R.M().ellipse(V.cx, 88, 6, 5), WHITE);
+});
+dress('pirate', 'Captain Coat', '#8a2335', { sleeve: 'long', neck: 'v', skirt: [112, 5] }, (R, r) => {
+  const V = R.V;
+  if (isFront(R)) {
+    R.paint(R.M().poly([[V.cx - 5, 68], [V.cx + 6, 68], [V.cx + 4, 112], [V.cx - 3, 112]]).and(R.M().rect(0, 0, 80, 112)), WHITE, { flat: true });
+    R.paint(R.M().poly([[V.cx - 4, 112], [V.cx + 5, 112], [V.cx + 4, 104], [V.cx - 3, 104]]).and(R.body(() => true)), ramp('#3a3440'), { lines: true });
+    [74, 80, 86].forEach(y => R.fill(R.M().rect(V.cx - 8, y, V.cx - 7, y + 1).rect(V.cx + 8, y, V.cx + 9, y + 1), '#f2c14e'));
+  }
+  waistBand(R, V.waistY - 1, 3, ramp('#3a3440'));
+  const cuffs = R.body((x, y, p) => p === 'arm' && y >= V.handY - 4);
+  R.paint(cuffs, GOLD, { lines: true });
+});
+dress('winter', 'Snow Parka', '#e0475a', { sleeve: 'long', neck: 'high', skirt: [106, 5] }, (R) => {
+  const V = R.V, fur = ramp('#fbf6ee');
+  R.paint(skirtMask(R, 102, 108, 6, 2, 4).keep((x, y) => y >= 102), fur, { flat: true });
+  R.paint(collarHigh(R), fur);
+  const cuffs = R.body((x, y, p) => p === 'arm' && y >= V.handY - 3);
+  R.paint(cuffs, fur, { lines: true });
+  if (isFront(R)) R.fill(R.M().rect(V.cx, 72, V.cx, 101), '#34303d');
+});
+dress('fairy', 'Petal Dress', '#8fe0b8', { sleeve: 'none', neck: 'sweet', skirt: [110, 10, 5] }, (R, r) => {
+  const V = R.V;
+  R.paint(skirtMask(R, V.waistY - 1, 102, 6, 4, 8), ramp(r[0]), { flat: true });
+});
+
+// ---------------- SHOES ----------------
+function feetMask(R, from, grow = 1) {
+  const V = R.V; from = from ?? V.footY;
+  const m = R.body((x, y, p) => (p === 'foot' || p === 'leg') && y >= from);
+  if (grow) { const g = m.clone().dilate(grow).keep((x, y) => y >= from + 1 && y <= V.h); m.add(g); }
+  return m;
+}
+item('shoes', 'sneakers', 'Sneakers', '#e0475a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R), r, { lines: true });
+  R.paint(feetMask(R).keep((x, y) => y >= V.h - 3), WHITE, { lines: true });
+  if (isFront(R)) R.fill(R.M().rect(V.cx - 13, V.footY + 3, V.cx - 9, V.footY + 3).rect(V.cx + 9, V.footY + 3, V.cx + 13, V.footY + 3), '#f7f3f8');
+});
+item('shoes', 'boots', 'Adventure Boots', '#8a5a3c', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R, V.kneeY), r, { lines: true });
+  R.paint(feetMask(R, V.kneeY).keep((x, y) => y <= V.kneeY + 3), ramp(r[2]), { lines: true });
+  R.paint(feetMask(R).keep((x, y) => y >= V.h - 2), BLACK, { lines: true });
+});
+item('shoes', 'mary', 'Mary Janes', '#34303d', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R, V.footY + 3), r, { lines: true });
+  R.fill(R.body((x, y, p) => p === 'foot' && y === V.footY + 1).sub(R.body((x, y) => R.bodyIdx(x, y) <= 1)), r[3]);
+  R.paint(R.body(() => true).keep((x, y) => (R.part(x, y) === 'leg' || R.part(x, y) === 'foot') && y >= V.kneeY && y < V.footY + 2), WHITE, { lines: true });
+});
+item('shoes', 'sandals', 'Beach Sandals', '#f08a3c', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R).keep((x, y) => y >= V.h - 2), r, { lines: true });
+  R.fill(R.body((x, y, p) => p === 'foot' && (y === V.footY + 3 || y === V.footY + 4)), r[2]);
+});
+item('shoes', 'bunnyslip', 'Bunny Slippers', '#f7f3f8', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R, V.footY, 2), r, { lines: true });
+  if (isSide(R)) R.paint(R.M().ellipse(30, V.footY - 1, 2, 4), r);
+  else R.paint(R.M().ellipse(V.cx - 13, V.footY - 1, 2, 4).ellipse(V.cx - 8, V.footY - 1, 2, 4).mirror(), r);
+  if (isFront(R)) R.fill(R.M().rect(V.cx - 12, V.footY + 5, V.cx - 11, V.footY + 5).mirror(), '#34303d');
+});
+item('shoes', 'rain', 'Rain Boots', '#f5d04a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R, V.kneeY + 2), r, { lines: true });
+});
+item('shoes', 'stockings', 'Striped Stockings', '#e0475a', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(R.body((x, y, p) => (p === 'leg' || p === 'foot') && y >= V.crotchY + 2), r, { lines: true, pattern: stripes(4, 2), alt: WHITE });
+  R.paint(feetMask(R, V.footY + 2), BLACK, { lines: true });
+});
+item('shoes', 'knight', 'Iron Greaves', '#c9cfdc', (R, ph, r) => {
+  if (ph !== 'front') return; const V = R.V;
+  R.paint(feetMask(R, V.kneeY - 2), r, { lines: true, pattern: (x, y) => y % 5 === 0, alt: ramp(r[2]) });
+});
+
+// ---------------- HAIR ----------------
+function hair(id, name, cfg) {
+  return item('hair', id, name, null, (R, ph, r) => drawHair(R, ph, r, cfg), { hair: true });
+}
+function bangLimit(cfg, dx, x) {
+  const b = cfg.bangs;
+  if (b === 'straight') return 31 + tri(x, 6, 3);
+  if (b === 'swept') return Math.min(36, 20 + (dx + 24) * 0.32) + tri(x, 7, 3);
+  if (b === 'parted') return Math.min(36, 14 + Math.abs(dx) * 0.8) + tri(x, 6, 2);
+  if (b === 'spiky') return 28 + tri(x, 8, 7);
+  if (b === 'short') return 18 + Math.abs(dx) * 0.3 + tri(x, 6, 3);
+  return 0;
+}
+function capMask(R, cfg) {
+  const V = R.V, view = R.view, vol = cfg.volume ?? 2;
+  let m;
+  if (cfg.puff) m = R.M().ellipse(V.headCx, view === 'side' ? 26 : 24, 44, 34);
+  else m = R.body((x, y, p) => p === 'head').dilate(vol);
+  const cx = V.headCx;
+  m.keep((x, y) => {
+    if (y < 8) return true;
+    if (view === 'back') return y < (cfg.side <= 44 ? 63 : 67);
+    if (view === 'side') {
+      if (x < 20) return y < bangLimit(cfg, -10, x);
+      if (x < 40) { const t = (x - 20) / 20, sl = Math.min(cfg.side, 48); return y < bangLimit(cfg, -10, x) * (1 - t) + sl * t; }
+      if (x < 54 && cfg.side <= 52) return y < 44;
+      return y < 66;
+    }
+    const dx = x - cx;
+    if (Math.abs(dx) >= 25) return y < cfg.side + (cfg.side > 50 ? tri(x, 6, 3) : 0);
+    return y < bangLimit(cfg, dx, x);
+  });
+  if (cfg.side >= 56 && view === 'front') { // face-framing locks
+    const L = R.M().poly([[cx - 38, 26], [cx - 27, 26], [cx - 27, cfg.side + 2], [cx - 38, cfg.side + 2]]).mirror();
+    L.keep((x, y) => y < cfg.side + 2 - tri(x, 5, 4));
+    m.add(L);
+  }
+  if (cfg.spikes) {
+    if (view === 'side') for (const [x, y] of [[20, 2], [34, -2], [48, 2], [60, 10]]) m.poly([[x - 7, y + 8], [x + 7, y + 8], [x + 9, y - 10]]);
+    else for (const dx of [-24, -12, 0, 12, 24]) m.poly([[cx + dx - 7, 8 - Math.abs(dx) / 4], [cx + dx + 7, 8 - Math.abs(dx) / 4], [cx + dx + dx / 5, -10 + Math.abs(dx) / 3]]);
+  }
+  return m;
+}
+function backHairMask(R, cfg) {
+  const V = R.V, cx = V.headCx, len = cfg.back, m = R.M();
+  if (!len) return m;
+  if (R.view === 'side') m.poly([[30, 14], [64, 10], [70 + (len > 90 ? 4 : 0), len], [38, len]]);
+  else m.poly([[cx - 36, 24], [cx + 36, 24], [cx + 38 + (cfg.flare || 0), len], [cx - 38 - (cfg.flare || 0), len]]);
+  const j = cfg.curls ? 6 : cfg.jag || 5;
+  m.keep((x, y) => y < len - tri(x, cfg.curls ? 10 : 7, j) + 1);
+  return m;
+}
+function tailMasks(R, cfg) {
+  const V = R.V, cx = V.headCx, m = R.M(), ties = R.M();
+  if (cfg.tails) {
+    if (R.view === 'side') { m.poly([[54, 12], [64, 18], [68, 50], [64, 84], [56, 94], [54, 70], [56, 40]]); ties.ellipse(58, 15, 3, 3); }
+    else {
+      m.poly([[cx - 34, 12], [cx - 28, 20], [cx - 34, 42], [cx - 38, 66], [cx - 36, 88], [cx - 44, 96], [cx - 50, 80], [cx - 50, 52], [cx - 46, 26]]).mirror();
+      ties.ellipse(cx - 36, 16, 3, 3).mirror();
+    }
+  }
+  if (cfg.pony || cfg.sidetail) {
+    const side = cfg.sidetail ? 1 : 0;
+    if (R.view === 'side') { m.poly([[58, 16 + side * 20], [70, 22 + side * 20], [74, 52 + side * 10], [68, 86 + side * 4], [62, 74], [62, 40]]); ties.ellipse(62, 20 + side * 20, 3, 3); }
+    else if (R.view === 'back' && !side) { m.poly([[cx - 6, 18], [cx + 6, 18], [cx + 11, 50], [cx + 6, 86], [cx, 94], [cx - 6, 86], [cx - 11, 50]]); ties.ellipse(cx, 20, 4, 3); }
+    else {
+      const s = (R.view === 'back') ? -1 : 1, b = cx + s * 30;
+      m.poly([[b, 20], [b + s * 12, 24], [b + s * 18, 54], [b + s * 14, 88], [b + s * 6, 96], [b + s * 4, 60]]);
+      ties.ellipse(b + s * 6, 24, 3, 3);
+    }
+  }
+  return { m, ties };
+}
+function bunMask(R, cfg) {
+  const V = R.V, m = R.M();
+  if (!cfg.buns) return m;
+  if (R.view === 'side') return m.ellipse(V.headCx + 12, -2, 9, 9);
+  return m.ellipse(V.headCx - 27, 2, 9, 9).mirror();
+}
+function hairShade(R, mask, r, cfg, cap) {
+  R.paint(mask, r, { flat: !cap });
+}
+function hairShine(R, cap, r) {
+  const V = R.V, cx = V.headCx - (R.view === 'side' ? 4 : 0), m = R.M();
+  for (let x = cx - 24; x <= cx + 24; x++) {
+    const dx = x - cx, y = Math.round(11 + dx * dx / 80);
+    if (((x - cx + 50) % 6) < 4 && cap.has(x, y) && cap.has(x, y + 3) && cap.has(x, y - 2)) m.set(x, y).set(x, y + 1);
+  }
+  R.fill(m, r[0]);
+}
+function hairStrands(R, mask, r, from, to, xs) {
+  const m = R.M();
+  for (const x of xs) for (let y = from; y < to; y++) if (mask.has(x, y) && mask.has(x - 1, y) && mask.has(x + 1, y) && mask.has(x, y + 2)) m.set(x, y);
+  R.fill(m, r[2]);
+}
+function drawHair(R, ph, r, cfg) {
+  const view = R.view, V = R.V, cx = V.headCx;
+  const back = backHairMask(R, cfg), { m: tails, ties } = tailMasks(R, cfg);
+  const tieR = ramp(cfg.tie || '#e0475a');
+  if (view !== 'back' && ph === 'back') {
+    if (!back.empty()) { R.paint(back, r, { flat: true }); hairStrands(R, back, r, 40, cfg.back - 4, view === 'side' ? [44, 52, 60] : [cx - 30, cx - 20, cx + 20, cx + 30]); }
+    if (!tails.empty()) { R.paint(tails, r, { flat: true }); hairStrands(R, tails, r, 30, 90, view === 'side' ? [60, 64] : [cx - 42, cx + 42, cx + 38, cx - 38]); R.paint(ties, tieR); }
+    return;
+  }
+  if (ph !== 'front') return;
+  if (view === 'back') {
+    if (!tails.empty()) { R.paint(tails, r, { flat: true }); hairStrands(R, tails, r, 30, 92, [cx - 42, cx + 42, cx, cx - 4, cx + 4]); }
+    if (!back.empty()) { R.paint(back, r, { flat: true }); }
+  }
+  const buns = bunMask(R, cfg);
+  if (!buns.empty()) { R.paint(buns, r, { flat: true }); }
+  const cap = capMask(R, cfg);
+  if (view === 'back' && !back.empty()) cap.add(back);
+  R.paint(cap, r, { headOnly: true });
+  if (view === 'back') hairStrands(R, cap, r, 24, (cfg.back || 66) - 4, [cx - 24, cx - 14, cx - 5, cx + 5, cx + 14, cx + 24]);
+  else {
+    // separations between bang clumps
+    const sep = R.M();
+    cap.each((x, y) => { if (y > 18 && y < 40 && !cap.has(x, y + 1 + (cfg.bangs === 'spiky' ? 3 : 2)) && ((x - cx) % 6 === 0)) sep.set(x, y); });
+    R.fill(sep, r[2]);
+  }
+  hairShine(R, cap, r);
+  if (view === 'back' && !ties.empty()) R.paint(ties, tieR);
+  if (view === 'back' && !buns.empty()) R.paint(buns, r, { flat: true });
+}
+hair('bob', 'Bob', { bangs: 'straight', side: 58, back: 72, volume: 3 });
+hair('long', 'Long & Straight', { bangs: 'straight', side: 62, back: 112 });
+hair('twintail', 'Twin Tails', { bangs: 'straight', side: 50, tails: true, tie: '#f7a8c4' });
+hair('pony', 'High Ponytail', { bangs: 'swept', side: 48, pony: true });
+hair('buns', 'Space Buns', { bangs: 'parted', side: 52, buns: true });
+hair('spiky', 'Hero Spikes', { bangs: 'spiky', side: 44, spikes: true, volume: 3 });
+hair('messy', 'Messy Short', { bangs: 'swept', side: 42, volume: 3 });
+hair('curtain', 'Curtain Bangs', { bangs: 'parted', side: 60, back: 88 });
+hair('curls', 'Princess Curls', { bangs: 'parted', side: 64, back: 118, curls: true, flare: 6 });
+hair('pixie', 'Pixie', { bangs: 'short', side: 40, volume: 1 });
+hair('sidetail', 'Side Tail', { bangs: 'swept', side: 50, sidetail: true, tie: '#f5d04a' });
+hair('puff', 'Cloud Puff', { bangs: 'short', side: 58, puff: true });
+hair('hime', 'Hime Cut', { bangs: 'straight', side: 66, back: 116 });
+hair('wolf', 'Wolf Cut', { bangs: 'spiky', side: 60, back: 80, jag: 8 });
+
+// ---------------- HATS ----------------
+function hat(id, name, dye, fn) { return item('hat', id, name, dye, (R, ph, r, hex) => ph === 'front' ? fn(R, r, R.V.headCx, R.view) : (fn.behind && fn.behind(R, r, R.V.headCx, R.view))); }
+const dome = (R, cx, top, rx, ry, cut) => R.M().ellipse(cx, top + ry, rx, ry).keep((x, y) => y <= cut);
+hat('beanie', 'Knit Beanie', '#e0475a', (R, r, cx) => {
+  R.paint(dome(R, cx, -4, 37, 24, 16), r, { flat: true, pattern: (x) => x % 4 === 0, alt: ramp(r[2]) });
+  R.paint(R.M().rect(cx - 37, 12, cx + 37, 18).and(R.M().ellipse(cx, 24, 38, 30)), ramp(r[2]), { flat: true, pattern: x => x % 2 === 0, alt: ramp(r[3]) });
+  R.paint(R.M().ellipse(cx, -6, 6, 5), WHITE, { flat: true });
+});
+hat('witchhat', 'Witch Hat', '#5b3d8f', (R, r, cx, v) => {
+  const s = v === 'back' ? -1 : 1;
+  R.paint(R.M().poly([[cx - 22, 4], [cx + 22, 4], [cx + 6 * s, -26], [cx + 22 * s, -38], [cx - 2 * s, -30]]), r, { flat: true });
+  R.paint(R.M().rect(cx - 21, -2, cx + 21, 3).and(R.M().poly([[cx - 22, 4], [cx + 22, 4], [cx + 15, -14], [cx - 15, -14]])), GOLD, { flat: true });
+  R.paint(R.M().ellipse(cx, 5, 46, 5), r, { flat: true });
+});
+hat('crown', 'Royal Crown', '#f2c14e', (R, r, cx) => {
+  const m = R.M().rect(cx - 15, -6, cx + 15, 3);
+  for (const dx of [-15, -5, 5, 15]) m.poly([[cx + dx - 5, -5], [cx + dx + 5, -5], [cx + dx, -16]]);
+  m.keep((x) => x >= cx - 15 && x <= cx + 15);
+  R.paint(m, r, { flat: true });
+  R.paint(R.M().ellipse(cx, -1, 2, 2), RED, { flat: true });
+  R.paint(R.M().ellipse(cx - 9, -1, 1, 1).ellipse(cx + 9, -1, 1, 1), ramp('#8cc8f2'), { flat: true });
+});
+hat('catears', 'Cat Ears', '#34303d', (R, r, cx, v) => {
+  const m = R.M(), inn = R.M();
+  if (v === 'side') { m.poly([[cx - 6, 8], [cx + 10, 6], [cx, -10]]); m.poly([[cx + 10, 8], [cx + 24, 8], [cx + 18, -8]]); inn.poly([[cx - 2, 6], [cx + 6, 5], [cx, -4]]); }
+  else { m.poly([[cx - 32, 12], [cx - 14, 2], [cx - 30, -12]]).mirror(); inn.poly([[cx - 28, 8], [cx - 18, 3], [cx - 28, -6]]).mirror(); }
+  R.paint(m, r, { flat: true });
+  if (v !== 'back') R.paint(inn, PINK, { flat: true, noOutline: true });
+});
+hat('bunny', 'Bunny Ears', '#f7f3f8', (R, r, cx, v) => {
+  const m = R.M(), inn = R.M();
+  if (v === 'side') { m.ellipse(cx + 4, -14, 5, 17).ellipse(cx + 14, -10, 5, 16); inn.ellipse(cx + 4, -14, 2, 12); }
+  else { m.ellipse(cx - 12, -16, 6, 18).mirror(); inn.ellipse(cx - 12, -16, 3, 13).mirror(); }
+  R.paint(m, r, { flat: true });
+  if (v !== 'back') R.paint(inn, PINK, { flat: true, noOutline: true });
+});
+hat('cap', 'Ball Cap', '#3f6fd8', (R, r, cx, v) => {
+  R.paint(dome(R, cx, -4, 36, 22, 14), r, { flat: true });
+  if (v === 'side') R.paint(R.M().poly([[cx - 20, 10], [cx - 44, 12], [cx - 46, 16], [cx - 20, 16]]), ramp(r[2]), { flat: true });
+  else if (v === 'front') R.paint(R.M().ellipse(cx, 15, 30, 4).keep((x, y) => y >= 13), ramp(r[2]), { flat: true });
+  else R.fill(R.M().ellipse(cx, 12, 5, 2), r[3]);
+  R.paint(R.M().ellipse(cx, -4, 3, 2), ramp(r[2]), { flat: true });
+});
+hat('tophat', 'Top Hat', '#34303d', (R, r, cx) => {
+  R.paint(R.M().rect(cx - 17, -28, cx + 17, 2), r, { flat: true });
+  R.paint(R.M().rect(cx - 17, -6, cx + 17, -1), RED, { flat: true });
+  R.paint(R.M().ellipse(cx, 3, 30, 4), r, { flat: true });
+});
+hat('flowers', 'Flower Crown', '#f7a8c4', (R, r, cx, v) => {
+  const span = v === 'side' ? [cx - 22, cx + 30] : [cx - 32, cx + 32];
+  const leaves = R.M(), cols = [r, ramp('#fff3a6'), WHITE];
+  for (let x = span[0]; x <= span[1]; x += 5) leaves.ellipse(x, 6 + Math.pow((x - cx) / 32, 2) * 8, 2, 1);
+  R.paint(leaves, GREEN, { flat: true });
+  let k = 0;
+  for (let x = span[0] + 2; x <= span[1]; x += 9, k++) {
+    const y = 4 + Math.pow((x - cx) / 32, 2) * 8;
+    R.paint(R.M().ellipse(x, y, 3, 3), cols[k % 3], { flat: true });
+    R.fill(R.M().set(x, y), '#f2a33a');
+  }
+});
+hat('halo', 'Angel Halo', '#f2c14e', (R, r, cx) => {
+  R.paint(R.M().ellipse(cx, -12, 22, 5).sub(R.M().ellipse(cx, -12, 17, 2)), r, { flat: true });
+});
+hat('horns', 'Devil Horns', '#c8364a', (R, r, cx, v) => {
+  const m = R.M();
+  if (v === 'side') m.poly([[cx - 6, 6], [cx + 4, 6], [cx - 8, -10]]);
+  else m.poly([[cx - 24, 8], [cx - 14, 4], [cx - 30, -10]]).mirror();
+  R.paint(m, r, { flat: true });
+});
+hat('bow', 'Big Bow', '#e0475a', (R, r, cx, v) => {
+  const bx = v === 'side' ? cx + 8 : v === 'back' ? cx - 20 : cx + 20, by = 2;
+  R.paint(R.M().poly([[bx, by], [bx - 13, by - 9], [bx - 13, by + 7]]).poly([[bx, by], [bx + 13, by - 9], [bx + 13, by + 7]]), r, { flat: true });
+  R.paint(R.M().poly([[bx - 2, by + 2], [bx - 6, by + 14], [bx - 2, by + 12]]).poly([[bx + 2, by + 2], [bx + 6, by + 14], [bx + 2, by + 12]]), ramp(r[2]), { flat: true });
+  R.paint(R.M().ellipse(bx, by, 3, 3), ramp(r[2]), { flat: true });
+});
+hat('viking', 'Viking Helm', '#c9cfdc', (R, r, cx, v) => {
+  const horns = R.M();
+  if (v === 'side') horns.poly([[cx - 4, 6], [cx + 6, 6], [cx - 10, -16], [cx - 6, -4]]);
+  else horns.poly([[cx - 30, 10], [cx - 26, 2], [cx - 40, -12], [cx - 44, -6]]).mirror();
+  R.paint(horns, ramp('#f6ead2'), { flat: true });
+  R.paint(dome(R, cx, -5, 37, 22, 14), r, { flat: true, pattern: (x) => (x - cx) % 12 === 0, alt: ramp(r[2]) });
+  R.paint(R.M().rect(cx - 37, 11, cx + 37, 15).and(R.M().ellipse(cx, 20, 38, 26)), GOLD, { flat: true });
+});
+hat('bandana', 'Rogue Bandana', '#34303d', (R, r, cx, v) => {
+  R.paint(dome(R, cx, -3, 37, 22, 16), r, { flat: true, pattern: (x, y) => (x + y) % 9 === 0, alt: ramp('#8b8fa3') });
+  const kx = v === 'side' ? cx + 34 : v === 'back' ? cx : cx + 34;
+  if (v !== 'front' || true) R.paint(R.M().poly([[kx, 12], [kx + 10, 22], [kx + 4, 26]]).poly([[kx, 12], [kx + 4, 30], [kx - 2, 30]]), r, { flat: true });
+});
+hat('tricorn', 'Captain Tricorn', '#34303d', (R, r, cx) => {
+  R.paint(R.M().poly([[cx - 44, 8], [cx - 28, -10], [cx, -14], [cx + 28, -10], [cx + 44, 8], [cx, 2]]), r, { flat: true });
+  R.paint(R.M().poly([[cx - 44, 8], [cx, 2], [cx + 44, 8], [cx, 5]]), GOLD, { flat: true, noOutline: true });
+  R.paint(R.M().ellipse(cx, -6, 3, 3), WHITE, { flat: true });
+});
+hat('mushroom', 'Mushroom Cap', '#f08a3c', (R, r, cx) => {
+  R.paint(R.M().ellipse(cx, 8, 46, 24).keep((x, y) => y <= 12), r, { flat: true });
+  R.paint(R.M().ellipse(cx - 18, -4, 5, 4).ellipse(cx + 14, -8, 6, 4).ellipse(cx + 34, 4, 4, 3).ellipse(cx - 36, 6, 3, 3), WHITE, { flat: true, noOutline: true });
+});
+hat('frog', 'Froggy Hat', '#5bb36a', (R, r, cx, v) => {
+  const eyes = v === 'side' ? R.M().ellipse(cx - 4, -8, 8, 7) : R.M().ellipse(cx - 18, -8, 8, 7).mirror();
+  R.paint(eyes, r, { flat: true });
+  R.paint(dome(R, cx, -4, 37, 22, 15), r, { flat: true });
+  if (v !== 'back') {
+    const w = v === 'side' ? R.M().ellipse(cx - 4, -8, 4, 4) : R.M().ellipse(cx - 18, -8, 4, 4).mirror();
+    R.paint(w, WHITE, { flat: true });
+    R.fill(v === 'side' ? R.M().rect(cx - 6, -9, cx - 5, -7) : R.M().rect(cx - 19, -9, cx - 18, -7).mirror(), '#2b2633');
+  }
+});
+hat('phones', 'Headphones', '#f7a8c4', (R, r, cx, v) => {
+  if (v === 'side') { R.paint(R.M().line(cx - 2, -2, cx + 12, 46, 3), ramp('#8b8fa3')); R.paint(R.M().ellipse(cx + 12, 52, 7, 9), r, { flat: true }); return; }
+  const band = R.M().ellipse(cx, 32, 38, 36).sub(R.M().ellipse(cx, 32, 35, 33)).keep((x, y) => y < 40);
+  R.paint(band, ramp('#8b8fa3'), { flat: true });
+  R.paint(R.M().ellipse(cx - 37, 48, 5, 9).mirror(), r, { flat: true });
+});
+
+// ---------------- FACE ----------------
+function face(id, name, dye, fn) { return item('face', id, name, dye, (R, ph, r) => { if (ph === 'front' && R.view !== 'back') fn(R, r, R.V.eyes, R.view); }); }
+face('roundglass', 'Round Glasses', '#8a5a3c', (R, r, eyes, v) => {
+  const m = R.M();
+  for (const [x, y] of eyes) m.ellipse(x, y, 9, 9).sub(R.M().ellipse(x, y, 7, 7));
+  if (v === 'front') m.rect(eyes[0][0] + 9, eyes[0][1] - 2, eyes[1][0] - 9, eyes[0][1] - 1);
+  else m.line(eyes[0][0] + 9, eyes[0][1] - 2, 44, 50, 1);
+  R.fill(m, r[3]);
+  for (const [x, y] of eyes) R.fill(R.M().ellipse(x, y, 7, 7), [220, 240, 255], 50);
+});
+face('shades', 'Cool Shades', '#2b2633', (R, r, eyes, v) => {
+  const m = R.M();
+  for (const [x, y] of eyes) m.poly([[x - 10, y - 6], [x + 10, y - 6], [x + 8, y + 5], [x - 8, y + 5]]);
+  if (v === 'front') m.rect(eyes[0][0] + 9, eyes[0][1] - 6, eyes[1][0] - 9, eyes[0][1] - 4);
+  else m.line(eyes[0][0] + 9, eyes[0][1] - 5, 44, 50, 1);
+  R.paint(m, r, { flat: true });
+  const s = R.M(); for (const [x, y] of eyes) s.line(x - 6, y - 3, x - 3, y - 3).line(x - 7, y - 1, x - 6, y - 1);
+  R.fill(s, [255, 255, 255], 170);
+});
+face('hearts', 'Heart Shades', '#f05a8e', (R, r, eyes, v) => {
+  const m = R.M();
+  for (const [x, y] of eyes) m.ellipse(x - 4, y - 3, 5, 4).ellipse(x + 4, y - 3, 5, 4).poly([[x - 9, y - 2], [x + 9, y - 2], [x, y + 8]]);
+  if (v === 'front') m.rect(eyes[0][0] + 9, eyes[0][1] - 4, eyes[1][0] - 9, eyes[0][1] - 3);
+  else m.line(eyes[0][0] + 9, eyes[0][1] - 3, 44, 50, 1);
+  R.paint(m, r, { flat: true });
+});
+face('patch', 'Eye Patch', '#2b2633', (R, r, eyes, v) => {
+  const [x, y] = v === 'front' ? eyes[1] : eyes[0];
+  const strap = v === 'front' ? R.M().line(x - 26, 22, x + 16, 58, 2) : R.M().line(4, 34, 46, 46, 2);
+  R.fill(strap, r[2]);
+  R.paint(R.M().ellipse(x, y, 7, 7), r, { flat: true });
+});
+face('ninja', 'Ninja Mask', '#34303d', (R, r, eyes, v) => {
+  const m = R.body((x, y, p) => p === 'head' && y >= 56 && (v === 'front' ? x > 10 && x < 70 : x < 34));
+  R.paint(m, r, { flat: true });
+});
+face('stickers', 'Star Stickers', '#f5d04a', (R, r, eyes, v) => {
+  const m = R.M();
+  for (const [x, y] of eyes) { const sx = x + (v === 'front' ? (x < 40 ? -4 : 4) : 2), sy = y + 11; m.poly([[sx, sy - 4], [sx + 1, sy - 1], [sx + 4, sy - 1], [sx + 2, sy + 1], [sx + 3, sy + 4], [sx, sy + 2], [sx - 3, sy + 4], [sx - 2, sy + 1], [sx - 4, sy - 1], [sx - 1, sy - 1]]); }
+  R.paint(m, r, { flat: true });
+});
+face('bandaid', 'Bandage', '#f6d7b8', (R, r, eyes, v) => {
+  const [x, y] = eyes[0]; const bx = v === 'front' ? x + 4 : x + 4, by = y + 11;
+  R.paint(R.M().rect(bx - 5, by - 2, bx + 5, by + 2), r, { flat: true });
+  R.fill(R.M().rect(bx - 1, by - 1, bx + 1, by + 1), r[2]);
+});
+face('whiskers', 'Kitty Whiskers', '#5c3228', (R, r, eyes, v) => {
+  const m = R.M();
+  for (const [x, y] of eyes) { const d = v === 'front' ? (x < 40 ? -1 : 1) : -1; m.line(x + d * 2, y + 9, x + d * 9, y + 8).line(x + d * 2, y + 11, x + d * 9, y + 12); }
+  R.fill(m, r[1]);
+});
+
+// ---------------- BACK ----------------
+function backItem(id, name, dye, fn) {
+  return item('back', id, name, dye, (R, ph, r) => {
+    const over = R.view === 'back';
+    if ((ph === 'front') === over) fn(R, r, R.V.cx, R.view, ph);
+  });
+}
+function wingShape(R, cx, v, pts) {
+  const m = R.M();
+  if (v === 'side') return m.poly(pts.map(([x, y]) => [52 - (x - cx) * 0.75, y - 4]));
+  return m.poly(pts).mirror();
+}
+backItem('angel', 'Angel Wings', '#f7f3f8', (R, r, cx, v) => {
+  const pts = [[cx - 10, 76], [cx - 22, 62], [cx - 38, 54], [cx - 52, 56], [cx - 56, 66], [cx - 52, 74], [cx - 54, 82], [cx - 48, 88], [cx - 48, 96], [cx - 38, 98], [cx - 30, 102], [cx - 22, 94], [cx - 12, 88]];
+  const m = wingShape(R, cx, v, pts);
+  R.paint(m, r, { flat: true, pattern: (x, y) => (y - 60) % 9 === 0 && Math.abs(x - cx) > 26, alt: ramp(r[2]) });
+});
+backItem('bat', 'Bat Wings', '#4a2e5c', (R, r, cx, v) => {
+  const pts = [[cx - 10, 78], [cx - 30, 56], [cx - 56, 50], [cx - 52, 66], [cx - 58, 78], [cx - 48, 80], [cx - 50, 92], [cx - 40, 88], [cx - 36, 98], [cx - 26, 90], [cx - 14, 92]];
+  R.paint(wingShape(R, cx, v, pts), r, { flat: true });
+});
+backItem('fairywings', 'Fairy Wings', '#a8dcf5', (R, r, cx, v) => {
+  const m = v === 'side' ? R.M().ellipse(60, 62, 10, 16).ellipse(58, 92, 7, 10) : R.M().ellipse(cx - 30, 64, 16, 11).ellipse(cx - 24, 90, 10, 8).mirror();
+  R.paint(m, r, { flat: true, alpha: 225, pattern: (x, y) => (x + y) % 7 === 0, alt: WHITE });
+});
+backItem('cape', 'Hero Cape', '#c8364a', (R, r, cx, v) => {
+  if (v === 'side') { R.paint(R.M().poly([[38, 68], [50, 68], [64, 120], [44, 122]]), r, { flat: true }); return; }
+  if (v === 'back') { R.paint(R.M().poly([[cx - 18, 67], [cx + 18, 67], [cx + 30, 122], [cx - 30, 122]]).keep((x, y) => y < 122 - tri(x, 10, 3)), r, { flat: true, pattern: (x) => (x - cx) % 10 === 0, alt: ramp(r[2]) }); return; }
+  R.paint(R.M().poly([[cx - 22, 68], [cx + 22, 68], [cx + 32, 122], [cx - 32, 122]]), ramp(r[2]), { flat: true });
+});
+backItem('backpack', 'Backpack', '#f08a3c', (R, r, cx, v) => {
+  if (v === 'side') { R.paint(R.M().poly([[46, 74], [58, 74], [60, 100], [48, 100]]), r, { flat: true }); return; }
+  if (v === 'back') {
+    R.paint(R.M().rect(cx - 14, 72, cx + 14, 100), r, { flat: true });
+    R.paint(R.M().rect(cx - 14, 72, cx + 14, 80), ramp(r[2]), { flat: true });
+    R.paint(R.M().rect(cx - 8, 88, cx + 8, 97), ramp(r[2]), { flat: true });
+    R.fill(R.M().rect(cx - 1, 80, cx + 1, 82), '#f2c14e');
+  }
+});
+backItem('quiver', 'Ranger Quiver', '#8a5a3c', (R, r, cx, v) => {
+  const m = v === 'side' ? R.M().poly([[50, 66], [56, 64], [62, 100], [56, 102]]) : R.M().poly([[cx + 6, 66], [cx + 14, 62], [cx + 4, 100], [cx - 4, 98]]);
+  const f = v === 'side' ? R.M().poly([[50, 66], [56, 64], [56, 56], [48, 58]]) : R.M().poly([[cx + 6, 66], [cx + 14, 62], [cx + 16, 54], [cx + 6, 56]]);
+  R.paint(f, WHITE, { flat: true }); R.paint(m, r, { flat: true });
+});
+backItem('foxtail', 'Fox Tail', '#f08a3c', (R, r, cx, v) => {
+  const m = v === 'side' ? R.M().poly([[46, 98], [60, 86], [74, 70], [76, 84], [64, 104], [50, 106]]) : R.M().poly([[cx - 4, 98], [cx + 14, 92], [cx + 28, 76], [cx + 30, 92], [cx + 18, 108], [cx, 106]]);
+  R.paint(m, r, { flat: true });
+  const tip = m.clone().keep((x, y) => v === 'side' ? x > 68 : y < 86);
+  R.paint(tip, WHITE, { flat: true });
+});
+
+// ---------------- HAND ----------------
+function held(id, name, dye, fn) {
+  return item('hand', id, name, dye, (R, ph, r) => {
+    const behind = R.view === 'back';
+    if ((ph === 'back') !== behind) return;
+    const [hx, hy] = R.V.hand;
+    fn(R, r, hx, hy, R.view);
+  });
+}
+const grip = (R, m) => m.sub(R.body((x, y, p) => p === 'hand'));
+held('wand', 'Star Wand', '#f7a8c4', (R, r, hx, hy) => {
+  R.paint(grip(R, R.M().line(hx, hy + 6, hx + 8, hy - 22, 2)), r, { flat: true });
+  const sx = hx + 9, sy = hy - 28;
+  R.paint(R.M().poly([[sx, sy - 7], [sx + 2, sy - 2], [sx + 7, sy - 2], [sx + 3, sy + 1], [sx + 5, sy + 6], [sx, sy + 3], [sx - 5, sy + 6], [sx - 3, sy + 1], [sx - 7, sy - 2], [sx - 2, sy - 2]]), GOLD, { flat: true });
+});
+held('sword', 'Hero Sword', '#c9cfdc', (R, r, hx, hy) => {
+  R.paint(R.M().poly([[hx - 2, hy - 6], [hx + 2, hy - 6], [hx + 2, hy - 36], [hx, hy - 40], [hx - 2, hy - 36]]), r, { flat: true });
+  R.paint(R.M().rect(hx - 7, hy - 7, hx + 7, hy - 5), GOLD, { flat: true });
+  R.paint(grip(R, R.M().rect(hx - 1, hy - 4, hx + 1, hy + 6)), WOOD, { flat: true });
+  R.paint(R.M().ellipse(hx, hy + 7, 2, 2), GOLD, { flat: true });
+});
+held('huntbow', 'Hunter Bow', '#8a5a3c', (R, r, hx, hy) => {
+  const m = R.M().ellipse(hx + 2, hy, 12, 26).sub(R.M().ellipse(hx + 2, hy, 10, 24)).keep((x) => x >= hx + 2);
+  R.paint(grip(R, m), r, { flat: true });
+  R.fill(R.M().line(hx + 3, hy - 25, hx + 3, hy + 25), [240, 236, 230]);
+});
+held('staff', 'Sage Staff', '#9a6a43', (R, r, hx, hy, v) => {
+  R.paint(grip(R, R.M().rect(hx - 1, hy - 40, hx + 1, hy + 24)), r, { flat: true });
+  R.paint(R.M().ellipse(hx, hy - 44, 5, 5), ramp('#7fd8f0'), { flat: true });
+  R.paint(R.M().poly([[hx - 6, hy - 40], [hx - 3, hy - 50], [hx - 2, hy - 40]]).poly([[hx + 6, hy - 40], [hx + 3, hy - 50], [hx + 2, hy - 40]]), GOLD, { flat: true });
+});
+held('dagger', 'Shadow Dagger', '#8b8fa3', (R, r, hx, hy) => {
+  R.paint(R.M().poly([[hx + 1, hy - 4], [hx + 4, hy - 4], [hx + 14, hy - 16], [hx + 10, hy - 14]]), r, { flat: true });
+  R.paint(grip(R, R.M().line(hx - 2, hy + 3, hx + 3, hy - 3, 2)), BLACK, { flat: true });
+});
+held('cutlass', 'Cutlass', '#c9cfdc', (R, r, hx, hy) => {
+  R.paint(R.M().poly([[hx - 1, hy - 6], [hx + 3, hy - 6], [hx + 8, hy - 22], [hx + 6, hy - 34], [hx + 2, hy - 24]]), r, { flat: true });
+  R.paint(R.M().ellipse(hx + 1, hy - 4, 6, 3).sub(R.M().ellipse(hx + 1, hy - 4, 4, 1)), GOLD, { flat: true });
+});
+held('balloon', 'Heart Balloon', '#e0475a', (R, r, hx, hy) => {
+  R.fill(R.M().line(hx + 1, hy - 4, hx + 6, hy - 36), [90, 70, 70]);
+  const bx = hx + 6, by = hy - 48;
+  R.paint(R.M().ellipse(bx - 5, by - 3, 6, 6).ellipse(bx + 5, by - 3, 6, 6).poly([[bx - 11, by - 1], [bx + 11, by - 1], [bx, by + 12]]), r, { flat: true });
+});
+held('bouquet', 'Bouquet', '#f7a8c4', (R, r, hx, hy) => {
+  R.paint(grip(R, R.M().poly([[hx - 2, hy - 6], [hx + 4, hy - 6], [hx + 2, hy + 10], [hx, hy + 10]])), GREEN, { flat: true });
+  const cols = [r, ramp('#fff3a6'), WHITE, r, ramp('#b9a0ef')];
+  [[-5, -12], [3, -14], [-1, -18], [6, -9], [-7, -6]].forEach(([dx, dy], k) => R.paint(R.M().ellipse(hx + dx, hy + dy, 3, 3), cols[k], { flat: true }));
+});
+held('icecream', 'Ice Cream', '#f7a8c4', (R, r, hx, hy) => {
+  R.paint(grip(R, R.M().poly([[hx - 4, hy - 8], [hx + 5, hy - 8], [hx + .5, hy + 6]])), ramp('#e3a35b'), { flat: true, pattern: (x, y) => (x + y) % 3 === 0, alt: ramp('#c47f3a') });
+  R.paint(R.M().ellipse(hx, hy - 11, 5, 4), r, { flat: true });
+  R.paint(R.M().ellipse(hx, hy - 17, 4, 3), ramp('#fff3d6'), { flat: true });
+  R.fill(R.M().ellipse(hx, hy - 21, 1, 1), '#e0475a');
+});
+held('plush', 'Teddy Plush', '#c98d65', (R, r, hx, hy) => {
+  const bx = hx + 4, by = hy - 2;
+  R.paint(R.M().ellipse(bx - 5, by - 12, 3, 3).ellipse(bx + 5, by - 12, 3, 3), r, { flat: true });
+  R.paint(R.M().ellipse(bx, by - 7, 7, 6), r, { flat: true });
+  R.paint(R.M().ellipse(bx, by + 4, 6, 6), r, { flat: true });
+  R.fill(R.M().set(bx - 3, by - 8).set(bx + 3, by - 8).set(bx, by - 5), '#2b2633');
+  R.paint(R.M().ellipse(bx, by + 5, 3, 3), ramp(r[0]), { flat: true, noOutline: true });
+});
+held('leafshield', 'Maple Shield', '#f08a3c', (R, r, hx, hy) => {
+  const c = hx + 2, y = hy - 4, s = 2.2;
+  const pts = [[0, -5], [2, -1], [6, -2], [4, 2], [6, 5], [1, 4], [0, 7], [-1, 4], [-6, 5], [-4, 2], [-6, -2], [-2, -1]].map(([x, yy]) => [c + x * s, y + yy * s]);
+  R.paint(R.M().poly(pts), r, { flat: true });
+  R.fill(R.M().line(c, y - 6, c, y + 14), r[3]);
+});
+
+// Defaults for the dye palette and presets
+const DYES = ['#f7f3f8', '#f6e3b8', '#f7a8c4', '#e0475a', '#f08a3c', '#f5d04a', '#8fe0b8', '#5bb36a', '#8cc8f2', '#3f6fd8', '#2c3a6b', '#b9a0ef', '#7a4bc4', '#8a5a3c', '#8b8fa3', '#34303d'];
+const HAIR_COLORS = ['#2b2633', '#4a2e24', '#7a4a2e', '#a35d36', '#d8743a', '#f0cf6e', '#f3ead2', '#c9ccd8', '#f49ac1', '#c8364a', '#4a7fe0', '#7fd8c0', '#8a5ad0', '#cbb4f0'];
+
+// Pixie Closet — pixel-art map backgrounds for the stage (SW x SH logical pixels).
+const SW = 256, SH = 208, GROUND = 184;
+
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function bands(g, cols, y0, y1) { // dithered vertical gradient
+  const n = cols.length - 1;
+  for (let y = y0; y < y1; y++) {
+    const t = (y - y0) / (y1 - y0) * n, i = Math.min(n - 1, Math.floor(t)), f = t - i;
+    for (let x = 0; x < SW; x += 2) {
+      const dith = ((x >> 1) + y) % 2 === 0 ? 0.25 : -0.25;
+      g.fillStyle = f + dith > 0.5 ? cols[i + 1] : cols[i];
+      g.fillRect(x, y, 2, 1);
+    }
+  }
+}
+function cloud(g, x, y, s, c, sh) {
+  g.fillStyle = sh; [[0, 4, 22, 6], [4, 0, 12, 6], [14, 2, 10, 6]].forEach(([a, b, w, h]) => g.fillRect(x + a * s, y + b * s + 2, w * s, h * s));
+  g.fillStyle = c; [[0, 4, 22, 5], [4, 0, 12, 6], [14, 2, 10, 6]].forEach(([a, b, w, h]) => g.fillRect(x + a * s, y + b * s, w * s, h * s));
+}
+function hills(g, y, amp, per, c, phase = 0) {
+  g.fillStyle = c;
+  for (let x = 0; x < SW; x++) { const h = Math.round(y - amp * (Math.sin((x + phase) / per) * .6 + Math.sin((x + phase) / (per * .43)) * .4)); g.fillRect(x, h, 1, SH - h); }
+}
+function groundStrip(g, top, side, dark, pattern) {
+  g.fillStyle = side; g.fillRect(0, GROUND, SW, SH - GROUND);
+  g.fillStyle = dark; for (let x = 0; x < SW; x += 8) for (let y = GROUND + 8; y < SH; y += 8) if (pattern(x, y)) g.fillRect(x + ((y >> 3) % 2) * 4, y, 3, 2);
+  g.fillStyle = top; g.fillRect(0, GROUND - 2, SW, 7);
+  for (let x = 0; x < SW; x += 3) g.fillRect(x, GROUND - 3 - ((x * 7) % 3 === 0 ? 1 : 0), 2, 2);
+  g.fillStyle = dark; g.fillRect(0, GROUND + 5, SW, 1);
+}
+function mushroomHouse(g, x, y, cap, s = 1) {
+  g.fillStyle = '#f3e3c6'; g.fillRect(x - 7 * s, y - 14 * s, 14 * s, 14 * s);
+  g.fillStyle = '#8a5a3c'; g.fillRect(x - 3 * s, y - 8 * s, 6 * s, 8 * s);
+  g.fillStyle = '#6fb7e0'; g.fillRect(x + 3 * s, y - 12 * s, 3 * s, 3 * s);
+  g.fillStyle = cap;
+  for (let r = 0; r < 12 * s; r++) { const w = Math.round(Math.sqrt(1 - Math.pow(1 - r / (12 * s), 2)) * 15 * s); g.fillRect(x - w, y - 14 * s - 12 * s + r, w * 2, 1); }
+  g.fillStyle = '#fff6ea'; g.fillRect(x - 8 * s, y - 22 * s, 3 * s, 3 * s); g.fillRect(x + 4 * s, y - 24 * s, 4 * s, 3 * s); g.fillRect(x + 10 * s, y - 18 * s, 2 * s, 2 * s);
+}
+function star(g, x, y, c) { g.fillStyle = c; g.fillRect(x, y, 1, 1); }
+
+const PARTICLES = [];
+function particles(kind, t, g) {
+  const r = rng(7);
+  const n = kind === 'leaf' ? 14 : kind === 'snow' ? 46 : kind === 'firefly' ? 18 : kind === 'petal' ? 18 : 0;
+  for (let i = 0; i < n; i++) {
+    const sp = .4 + r() * .6, x0 = r() * SW, ph = r() * 1000;
+    if (kind === 'firefly') {
+      const x = (x0 + Math.sin((t / 1400 + ph) * sp) * 18 + SW) % SW, y = 60 + r() * 110 + Math.cos((t / 1100 + ph)) * 10;
+      const on = Math.sin(t / 400 + ph) > -.2; if (!on) continue;
+      g.fillStyle = '#f9f7a0'; g.fillRect(x | 0, y | 0, 2, 2); g.fillStyle = 'rgba(249,247,160,.25)'; g.fillRect((x | 0) - 1, (y | 0) - 1, 4, 4);
+      continue;
+    }
+    const y = ((t / 40) * sp + ph) % (SH + 20) - 10, x = (x0 + Math.sin(y / 18 + ph) * 8 + (kind === 'snow' ? 0 : y * .3)) % SW;
+    if (kind === 'snow') { g.fillStyle = '#ffffff'; g.fillRect(x | 0, y | 0, sp > .7 ? 2 : 1, sp > .7 ? 2 : 1); }
+    else if (kind === 'leaf') { g.fillStyle = i % 3 ? '#f08a3c' : '#e0475a'; g.fillRect(x | 0, y | 0, 3, 2); g.fillRect((x | 0) + 1, (y | 0) - 1, 1, 4); }
+    else { g.fillStyle = i % 2 ? '#f7c3d6' : '#fde4ef'; g.fillRect(x | 0, y | 0, 2, 2); g.fillRect((x | 0) + 1, (y | 0) + 1, 1, 1); }
+  }
+}
+
+const SCENES = [
+  {
+    id: 'meadow', name: 'Mushroom Meadow', draw(g, t) {
+      bands(g, ['#7cc6f2', '#9fd7f5', '#c9ecf7', '#eaf7f1'], 0, GROUND);
+      g.fillStyle = '#fff4b8'; g.fillRect(206, 18, 16, 16); g.fillStyle = '#ffe680'; g.fillRect(208, 20, 12, 12);
+      [[20, 24, 1], [120, 40, 1], [190, 62, 1]].forEach(([x, y, s], i) => cloud(g, ((x + t / (90 + i * 30)) % (SW + 60)) - 40, y, s, '#ffffff', '#d7ecf7'));
+      hills(g, 140, 10, 30, '#a7dc8f', 0); hills(g, 160, 8, 22, '#7ec46d', 40);
+      mushroomHouse(g, 40, 170, '#f08a3c'); mushroomHouse(g, 214, 172, '#e0475a', 1);
+      groundStrip(g, '#6cc35a', '#b0794a', '#94603a', (x, y) => (x * 3 + y) % 5 === 0);
+      particles('leaf', t, g);
+    },
+  },
+  {
+    id: 'forest', name: 'Fairy Forest', draw(g, t) {
+      bands(g, ['#173a3f', '#1f5450', '#2c6b5a', '#3c7f5e'], 0, GROUND);
+      const r = rng(3);
+      for (let i = 0; i < 9; i++) { const x = r() * SW | 0, w = 8 + r() * 10 | 0; g.fillStyle = i % 2 ? '#22433d' : '#2a4f45'; g.fillRect(x, 0, w, GROUND); g.fillStyle = '#1b3934'; g.fillRect(x + w - 2, 0, 2, GROUND); }
+      g.fillStyle = '#3f8a5b'; for (let x = 0; x < SW; x += 6) { const h = 16 + Math.sin(x / 9) * 6; g.fillRect(x, 0, 6, h); }
+      for (const [x, c] of [[30, '#f7a8c4'], [90, '#b9a0ef'], [180, '#8fe0b8'], [232, '#f5d04a']]) { g.fillStyle = '#2e6b45'; g.fillRect(x, GROUND - 10, 1, 8); g.fillStyle = c; g.fillRect(x - 2, GROUND - 13, 5, 4); }
+      groundStrip(g, '#4f9c5a', '#4b3b33', '#3b2e29', (x, y) => (x + y * 2) % 7 === 0);
+      particles('firefly', t, g);
+    },
+  },
+  {
+    id: 'sky', name: 'Cloud Garden', draw(g, t) {
+      bands(g, ['#b9a0ef', '#d3b8f2', '#f7c3d6', '#fde4d2'], 0, SH);
+      for (let i = 0; i < 26; i++) star(g, (i * 53) % SW, (i * 29) % 90, '#fff');
+      [[10, 30, 1], [140, 20, 2], [60, 90, 1], [200, 110, 1]].forEach(([x, y, s], i) => cloud(g, ((x + t / (120 + i * 40)) % (SW + 60)) - 40, y, s, '#fff7fb', '#e6d2f2'));
+      g.fillStyle = '#f2c14e'; g.fillRect(24, 120, 2, 40); g.fillRect(230, 110, 2, 50);
+      g.fillStyle = '#e6d2f2'; g.fillRect(0, GROUND + 2, SW, SH);
+      g.fillStyle = '#ffffff'; for (let x = -8; x < SW; x += 16) { g.fillRect(x, GROUND - 4, 20, 10); g.fillRect(x + 4, GROUND - 8, 12, 6); }
+      g.fillStyle = '#f3e6fa'; g.fillRect(0, GROUND + 6, SW, 3);
+      particles('petal', t, g);
+    },
+  },
+  {
+    id: 'snow', name: 'Snowy Peak', draw(g, t) {
+      bands(g, ['#5d86c9', '#7fa7dd', '#a9c8ec', '#dce9f7'], 0, GROUND);
+      g.fillStyle = '#c3d3ea';
+      for (const [cx, h, w] of [[50, 90, 70], [150, 110, 90], [230, 80, 60]]) for (let y = 0; y < h; y++) { const hw = y * w / h; g.fillRect(cx - hw, GROUND - 20 - h + y, hw * 2, 1); }
+      g.fillStyle = '#ffffff';
+      for (const [cx, h, w] of [[50, 90, 70], [150, 110, 90], [230, 80, 60]]) for (let y = 0; y < h * .3; y++) { const hw = y * w / h; g.fillRect(cx - hw, GROUND - 20 - h + y, hw * 2, 1); }
+      for (const x of [20, 210]) { g.fillStyle = '#2f6a5c'; for (let y = 0; y < 34; y++) { const hw = (y % 12) * .8 + y * .25; g.fillRect(x - hw, GROUND - 40 + y, hw * 2, 1); } g.fillStyle = '#6b4a3a'; g.fillRect(x - 2, GROUND - 6, 4, 6); }
+      groundStrip(g, '#ffffff', '#cfe0f3', '#b3c9e6', (x, y) => (x + y) % 6 === 0);
+      particles('snow', t, g);
+    },
+  },
+  {
+    id: 'toy', name: 'Toy Town', draw(g, t) {
+      bands(g, ['#fde4ef', '#fbefd9', '#f6f2c9'], 0, GROUND);
+      const cols = ['#8cc8f2', '#f7a8c4', '#f5d04a', '#8fe0b8', '#b9a0ef'];
+      [[8, 120, 30, 64], [44, 140, 24, 44], [190, 100, 26, 84], [222, 132, 30, 52]].forEach(([x, y, w, h], i) => {
+        for (let yy = y; yy < y + h; yy += 10) for (let xx = x; xx < x + w; xx += 10) { g.fillStyle = cols[(i + (xx >> 3) + (yy >> 3)) % 5]; g.fillRect(xx, yy, 9, 9); }
+      });
+      g.fillStyle = '#e0475a'; g.fillRect(120, 60, 18, 70); g.fillStyle = '#fff'; g.fillRect(122, 66, 14, 14);
+      g.fillStyle = '#34303d'; const a = t / 1000; g.fillRect(128, 72, 2, 2); g.fillRect(129 + Math.round(Math.cos(a) * 4), 73 + Math.round(Math.sin(a) * 4), 1, 1);
+      g.fillStyle = '#3f6fd8'; for (let y = 0; y < 12; y++) g.fillRect(129 - y, 48 + y, y * 2 + 1, 1);
+      for (let x = 0; x < SW; x += 16) { g.fillStyle = (x / 16) % 2 ? '#f7f3f8' : '#e0475a'; g.fillRect(x, GROUND - 2, 16, 26); }
+      g.fillStyle = '#c03a4b'; g.fillRect(0, GROUND + 5, SW, 1);
+    },
+  },
+  {
+    id: 'night', name: 'Lantern Market', draw(g, t) {
+      bands(g, ['#1b1840', '#2c2463', '#4a3480', '#7a4a8f'], 0, GROUND);
+      for (let i = 0; i < 40; i++) if (Math.sin(t / 600 + i * 3) > -.6) star(g, (i * 67) % SW, (i * 37) % 120, i % 5 ? '#e8e2ff' : '#fff3a6');
+      g.fillStyle = '#fdf1c4'; g.fillRect(30, 20, 14, 14); g.fillStyle = '#1b1840'; g.fillRect(36, 18, 12, 12);
+      g.fillStyle = '#2a2050'; for (const [x, w, h] of [[0, 40, 50], [36, 30, 70], [170, 40, 60], [206, 50, 44]]) g.fillRect(x, GROUND - h, w, h);
+      g.fillStyle = '#f5d04a'; for (const [x, y] of [[8, 150], [20, 150], [44, 130], [56, 140], [180, 140], [192, 140], [216, 154], [236, 154]]) g.fillRect(x, y, 4, 5);
+      g.strokeStyle = '#140f2e';
+      for (let x = 0; x < SW; x++) { const y = 46 + Math.round(Math.cosh((x - 128) / 90) * 6); g.fillStyle = '#140f2e'; g.fillRect(x, y, 1, 1); if (x % 24 === 12) { const sw = Math.round(Math.sin(t / 700 + x) * 1); g.fillStyle = '#e0475a'; g.fillRect(x - 3 + sw, y + 2, 7, 8); g.fillStyle = '#f5d04a'; g.fillRect(x - 1 + sw, y + 4, 3, 4); } }
+      groundStrip(g, '#6b4a8f', '#3b2c55', '#2c2142', (x, y) => (x + y) % 4 === 0);
+    },
+  },
+  {
+    id: 'studio', name: 'Sprite Studio', draw(g) {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, SW, SH);
+      g.fillStyle = '#e4e2ea'; for (let x = 0; x < SW; x += 12) g.fillRect(x, 0, 1, SH); for (let y = 4; y < SH; y += 12) g.fillRect(0, y, SW, 1);
+      g.fillStyle = '#efedf3'; g.fillRect(0, GROUND, SW, SH - GROUND); g.fillStyle = '#d4d1dc'; g.fillRect(0, GROUND, SW, 1);
+    },
+  },
+];
+
+// Pixie Closet — UI, stage loop, presets, saving.
+(function () {
+  const $ = id => document.getElementById(id);
+  const CATS = ['hair', 'top', 'bottom', 'dress', 'shoes', 'hat', 'face', 'back', 'hand'];
+  const TABS = [
+    { id: 'body', label: 'Body' }, { id: 'hair', label: 'Hair' }, { id: 'top', label: 'Tops' }, { id: 'bottom', label: 'Bottoms' },
+    { id: 'dress', label: 'Outfits' }, { id: 'shoes', label: 'Shoes' }, { id: 'hat', label: 'Hats' }, { id: 'face', label: 'Face' },
+    { id: 'back', label: 'Back' }, { id: 'hand', label: 'Weapons' },
+  ];
+  const DIRS = [{ v: 'front', flip: false, label: 'Front' }, { v: 'side', flip: true, label: 'Right' }, { v: 'back', flip: false, label: 'Back' }, { v: 'side', flip: false, label: 'Left' }];
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem('pixie.' + k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem('pixie.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  };
+
+  const PRESETS = [
+    { name: 'Beginner', s: { hair: ['messy', '#7a4a2e'], top: ['maple'], bottom: ['shorts', '#4d74b8'], shoes: ['sneakers'] } },
+    { name: 'Warrior', s: { hair: ['spiky', '#c8364a'], top: ['armor'], bottom: ['joggers', '#5a5566'], shoes: ['knight'], hat: ['viking'], back: ['cape'], hand: ['sword'] } },
+    { name: 'Magician', s: { hair: ['long', '#cbb4f0'], dress: ['witch'], shoes: ['mary'], hat: ['witchhat'], hand: ['staff'], face: ['roundglass', '#f2c14e'] } },
+    { name: 'Bowman', s: { hair: ['pony', '#a35d36'], top: ['tunic'], bottom: ['cargo', '#7a6a4a'], shoes: ['boots'], back: ['quiver'], hand: ['huntbow'], hat: ['flowers', '#f7f3f8'] } },
+    { name: 'Thief', s: { hair: ['wolf', '#2b2633'], top: ['hoodie', '#34303d'], bottom: ['joggers', '#2c3a6b'], shoes: ['boots', '#34303d'], face: ['ninja'], hand: ['dagger'], hat: ['bandana', '#7a4bc4'] } },
+    { name: 'Pirate', s: { hair: ['hime', '#c8364a'], dress: ['pirate'], shoes: ['boots', '#34303d'], hat: ['tricorn'], hand: ['cutlass'], face: ['patch'] } },
+    { name: 'Princess', s: { hair: ['curls', '#f0cf6e'], dress: ['gown'], shoes: ['mary', '#f7f3f8'], hat: ['crown'], hand: ['bouquet'] } },
+    { name: 'Magical Girl', s: { hair: ['twintail', '#f49ac1'], dress: ['magical'], shoes: ['stockings', '#f7a8c4'], hat: ['bow', '#f7a8c4'], back: ['fairywings'], hand: ['wand'] } },
+    { name: 'Cozy Day', s: { hair: ['buns', '#4a2e24'], top: ['sweater', '#f6e3b8'], bottom: ['maxi', '#8a5a3c'], shoes: ['bunnyslip'], hat: ['phones'], hand: ['plush'] } },
+    { name: 'Mushroom Kid', s: { hair: ['puff', '#d8743a'], top: ['tee', '#f7f3f8'], bottom: ['overalls', '#e0475a'], shoes: ['rain'], hat: ['mushroom'], hand: ['leafshield'] } },
+  ];
+
+  let state = defaultState();
+  let dir = 0, tab = 'hair', sceneIdx = 0, bubbleUntil = 0;
+  function defaultState() { return fromPreset(PRESETS[0], { name: 'Pixie', skin: 0, eyes: 0, job: 'Beginner' }); }
+  function fromPreset(p, base) {
+    const equip = {};
+    for (const [cat, [id, color]] of Object.entries(p.s)) equip[cat] = { id, color: color || null };
+    return { name: base.name, skin: base.skin, eyes: base.eyes, job: p.name, equip };
+  }
+
+  // ---------- character rendering with cache ----------
+  const charCanvas = document.createElement('canvas'); charCanvas.width = CW; charCanvas.height = CH;
+  const cctx = charCanvas.getContext('2d');
+  let cacheKey = '';
+  function drawChar(view, blink) {
+    const key = JSON.stringify(state.equip) + state.skin + state.eyes + view + blink;
+    if (key === cacheKey) return;
+    cacheKey = key;
+    const buf = renderCharacter(view, state, { blink });
+    cctx.putImageData(new ImageData(buf, CW, CH), 0, 0);
+  }
+
+  // ---------- stage ----------
+  const view = $('view'), g = view.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  let blinkAt = performance.now() + 2500, blinkOn = false;
+  function frame(t) {
+    if (t > blinkAt) { blinkOn = true; if (t > blinkAt + 140) { blinkOn = false; blinkAt = t + 2200 + Math.random() * 2800; } }
+    const d = DIRS[dir];
+    SCENES[sceneIdx].draw(g, t);
+    // shadow
+    g.fillStyle = 'rgba(40,20,30,.22)';
+    for (let y = 0; y < 4; y++) { const w = 26 - Math.abs(y - 1.5) * 4; g.fillRect(128 - w, GROUND - 2 + y, w * 2, 1); }
+    drawChar(d.v, blinkOn && d.v !== 'back');
+    const bob = Math.floor(t / 520) % 2;
+    g.save();
+    if (d.flip) { g.translate(SW, 0); g.scale(-1, 1); }
+    g.drawImage(charCanvas, 64, GROUND - FEET_Y + bob);
+    g.restore();
+    if (bubbleUntil && t > bubbleUntil) { $('bubble').hidden = true; bubbleUntil = 0; }
+    requestAnimationFrame(frame);
+  }
+
+  function turn(step) { dir = (dir + step + DIRS.length) % DIRS.length; $('viewlbl').textContent = DIRS[dir].label; }
+  $('turnL').onclick = () => turn(-1);
+  $('turnR').onclick = () => turn(1);
+  let dragX = null;
+  $('stage').addEventListener('pointerdown', e => { if (e.target.closest('button')) return; dragX = e.clientX; });
+  window.addEventListener('pointermove', e => { if (dragX === null) return; const dx = e.clientX - dragX; if (Math.abs(dx) > 36) { turn(dx > 0 ? -1 : 1); dragX = e.clientX; } });
+  window.addEventListener('pointerup', () => { dragX = null; });
+  document.addEventListener('keydown', e => {
+    if (e.target.closest('input, textarea, select')) return;
+    if (e.key === 'ArrowLeft') turn(-1); else if (e.key === 'ArrowRight') turn(1);
+    else if (e.key === 'r' || e.key === 'R') randomize();
+  });
+
+  // ---------- header fields ----------
+  SCENES.forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.name; $('map').appendChild(o); });
+  $('map').onchange = () => { sceneIdx = +$('map').value; $('mapname').textContent = SCENES[sceneIdx].name; save(); };
+  $('name').oninput = () => { state.name = $('name').value.trim() || 'Pixie'; refreshTags(); save(); };
+  $('chatform').addEventListener('submit', e => {
+    e.preventDefault(); const msg = $('chat').value.trim(); if (!msg) return;
+    const b = $('bubble'); b.textContent = msg; b.hidden = false; bubbleUntil = performance.now() + 5000; $('chat').value = '';
+  });
+  function refreshTags() {
+    $('nm').textContent = state.name;
+    const n = Object.values(state.equip).filter(Boolean).length;
+    $('statline').textContent = `Lv. ${8 + n * 9} · ${state.job || 'Adventurer'}`;
+  }
+
+  // ---------- thumbnails ----------
+  function thumb(canvas, buf, crop) {
+    let [x0, y0, x1, y1] = crop || bbox(buf);
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, S = canvas.width - 6;
+    let s = Math.min(S / w, S / h); if (s >= 1) s = Math.floor(s);
+    const t = document.createElement('canvas'); t.width = CW; t.height = CH; t.getContext('2d').putImageData(new ImageData(buf, CW, CH), 0, 0);
+    const c = canvas.getContext('2d'); c.clearRect(0, 0, canvas.width, canvas.height);
+    c.imageSmoothingEnabled = s < 1;
+    c.drawImage(t, x0, y0, w, h, Math.round((canvas.width - w * s) / 2), Math.round((canvas.height - h * s) / 2), w * s, h * s);
+  }
+  function bbox(buf) {
+    let x0 = CW, y0 = CH, x1 = 0, y1 = 0;
+    for (let i = 3; i < buf.length; i += 4) if (buf[i]) { const p = (i - 3) / 4, x = p % CW, y = p / CW | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    return x0 > x1 ? [0, 0, CW - 1, CH - 1] : [x0, y0, x1, y1];
+  }
+  const OY = FEET_Y - VIEWS.front.h, OX = 64 - VIEWS.front.cx;
+  const HEAD_CROP = [OX - 22, OY - 40, OX + 102, OY + 84];
+
+  // ---------- inventory ----------
+  TABS.forEach(t => {
+    const b = document.createElement('button'); b.className = 'tab'; b.setAttribute('role', 'tab'); b.textContent = t.label; b.dataset.tab = t.id;
+    b.onclick = () => { tab = t.id; buildGrid(); }; $('tabs').appendChild(b);
+  });
+  $('count').textContent = `${ITEMS.length} items · ${TABS.length - 1} slots`;
+  function cell(label, pressed, onclick) {
+    const b = document.createElement('button'); b.className = 'cell'; b.setAttribute('aria-pressed', pressed); b.title = label; b.setAttribute('aria-label', label);
+    b.onclick = onclick; $('grid').appendChild(b); return b;
+  }
+  function buildGrid() {
+    document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+    const grid = $('grid'); grid.innerHTML = '';
+    if (tab === 'body') {
+      SKIN_TONES.forEach((s, i) => {
+        const b = cell(s.name, state.skin === i, () => { state.skin = i; changed(); });
+        const c = document.createElement('canvas'); c.width = c.height = 64; b.appendChild(c);
+        thumb(c, renderCharacter('front', { skin: i, eyes: state.eyes, equip: {} }), [OX, OY, OX + 80, OY + 127]);
+      });
+      buildSwatches(); showName(); return;
+    }
+    const cur = state.equip[tab];
+    const none = cell('None', !cur, () => { delete state.equip[tab]; changed(); });
+    none.innerHTML = '<span class="x">none</span>';
+    ITEMS.filter(i => i.cat === tab).forEach(it => {
+      const sel = cur && cur.id === it.id;
+      const b = cell(it.name, !!sel, () => equip(it));
+      const c = document.createElement('canvas'); c.width = c.height = 64; b.appendChild(c);
+      const color = sel && cur.color ? cur.color : (tab === 'hair' ? (cur && cur.color) || '#7a4a2e' : it.dye);
+      const withBody = tab === 'hair' || tab === 'hat' || tab === 'face';
+      const buf = renderCharacter('front', { skin: state.skin, eyes: state.eyes, equip: {} }, { only: { id: it.id, color }, withBody });
+      thumb(c, buf, withBody ? (tab === 'face' ? [OX + 4, OY + 28, OX + 76, OY + 70] : HEAD_CROP) : null);
+    });
+    buildSwatches(); showName();
+  }
+  function showName() {
+    const n = $('itemname');
+    if (tab === 'body') { n.innerHTML = `${SKIN_TONES[state.skin].name} <span>skin · ${EYE_COLORS[state.eyes].name} eyes</span>`; return; }
+    const cur = state.equip[tab];
+    n.innerHTML = cur ? `${ITEM_BY_ID[cur.id].name} <span>equipped</span>` : `<span>Nothing equipped in this slot</span>`;
+  }
+  function buildSwatches() {
+    const box = $('swatches'); box.innerHTML = '';
+    if (tab === 'body') {
+      $('dyelbl').textContent = 'Eye color';
+      EYE_COLORS.forEach((e, i) => {
+        const b = document.createElement('button'); b.className = 'sw big'; b.setAttribute('aria-pressed', state.eyes === i);
+        b.innerHTML = `<i style="background:${e.c[1]}"></i>${e.name}`; b.onclick = () => { state.eyes = i; changed(); }; box.appendChild(b);
+      });
+      return;
+    }
+    const cur = state.equip[tab];
+    $('dyelbl').textContent = tab === 'hair' ? 'Hair color' : 'Dye';
+    if (!cur) { box.innerHTML = '<span class="hint">Equip an item to dye it.</span>'; return; }
+    const it = ITEM_BY_ID[cur.id], now = (cur.color || it.dye || '').toLowerCase();
+    (tab === 'hair' ? HAIR_COLORS : DYES).forEach(hex => {
+      const b = document.createElement('button'); b.className = 'sw'; b.style.background = hex; b.title = hex; b.setAttribute('aria-label', 'Dye ' + hex);
+      b.setAttribute('aria-pressed', now === hex.toLowerCase()); b.onclick = () => { cur.color = hex; changed(); }; box.appendChild(b);
+    });
+    const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'custom-dye'; pick.value = /^#[0-9a-f]{6}$/i.test(now) ? now : '#999999'; pick.title = 'Custom color';
+    pick.oninput = () => { cur.color = pick.value; cacheKey = ''; save(); };
+    pick.onchange = () => { cur.color = pick.value; changed(); };
+    box.appendChild(pick);
+    if (it.dye && tab !== 'hair') {
+      const r = document.createElement('button'); r.className = 'btn'; r.textContent = 'Original'; r.style.padding = '2px 8px'; r.style.fontSize = '12px';
+      r.onclick = () => { cur.color = null; changed(); }; box.appendChild(r);
+    }
+  }
+  function equip(it) {
+    const prev = state.equip[it.cat];
+    state.equip[it.cat] = { id: it.id, color: it.cat === 'hair' ? (prev && prev.color) || '#7a4a2e' : null };
+    if (it.cat === 'dress') { delete state.equip.top; delete state.equip.bottom; }
+    if (it.cat === 'top' || it.cat === 'bottom') delete state.equip.dress;
+    changed();
+  }
+  function changed() { cacheKey = ''; refreshTags(); buildGrid(); save(); }
+
+  // ---------- presets / random ----------
+  PRESETS.forEach(p => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = p.name;
+    b.onclick = () => { state = fromPreset(p, state); changed(); toast(`${p.name} outfit equipped`); };
+    $('jobs').appendChild(b);
+  });
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  function randomize() {
+    const eq = {}, by = c => ITEMS.filter(i => i.cat === c);
+    eq.hair = { id: pick(by('hair')).id, color: pick(HAIR_COLORS) };
+    if (Math.random() < .35) eq.dress = { id: pick(by('dress')).id, color: Math.random() < .5 ? pick(DYES) : null };
+    else { eq.top = { id: pick(by('top')).id, color: pick(DYES) }; eq.bottom = { id: pick(by('bottom')).id, color: pick(DYES) }; }
+    eq.shoes = { id: pick(by('shoes')).id, color: Math.random() < .5 ? pick(DYES) : null };
+    for (const [c, p] of [['hat', .55], ['face', .3], ['back', .3], ['hand', .5]]) if (Math.random() < p) eq[c] = { id: pick(by(c)).id, color: Math.random() < .4 ? pick(DYES) : null };
+    state.equip = eq; state.skin = Math.floor(Math.random() * 6); state.eyes = Math.floor(Math.random() * EYE_COLORS.length);
+    state.job = pick(['Adventurer', 'Wanderer', 'Fashionista', 'Explorer', 'Dreamer']);
+    changed();
+  }
+  $('rand').onclick = randomize;
+  $('undress').onclick = () => { state.equip = {}; state.job = 'Beginner'; changed(); };
+
+  // ---------- closet slots ----------
+  function buildSlots() {
+    const box = $('slots'); box.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const data = store.get('slot' + i);
+      const d = document.createElement('div'); d.className = 'slot';
+      const c = document.createElement('canvas'); c.width = 96; c.height = 132; d.appendChild(c);
+      if (data) thumb(c, renderCharacter('front', data), [OX - 6, OY - 30, OX + 86, OY + 128]);
+      else { const x = c.getContext('2d'); x.fillStyle = '#c9a985'; x.font = '600 14px "Pixelify Sans", sans-serif'; x.textAlign = 'center'; x.fillText('empty', 48, 70); }
+      const r = document.createElement('div'); r.className = 'row';
+      const sv = document.createElement('button'); sv.className = 'btn'; sv.textContent = 'Save';
+      sv.onclick = () => { store.set('slot' + i, state); buildSlots(); toast(`Saved to slot ${i + 1}`); };
+      const ld = document.createElement('button'); ld.className = 'btn'; ld.textContent = 'Wear'; ld.disabled = !data;
+      ld.onclick = () => { state = JSON.parse(JSON.stringify(data)); $('name').value = state.name; changed(); toast(`Wearing slot ${i + 1}`); };
+      r.append(sv, ld); d.appendChild(r); box.appendChild(d);
+    }
+  }
+
+  // ---------- snapshot + share ----------
+  function dialog(title, nodes) {
+    $('dlgtitle').textContent = title; const body = $('dlgbody'); body.innerHTML = ''; nodes.forEach(n => body.appendChild(n));
+    const d = $('dlg'); if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+  }
+  $('dlgclose').onclick = () => { const d = $('dlg'); d.close ? d.close() : d.removeAttribute('open'); };
+  $('snap').onclick = () => {
+    const S = 3, c = document.createElement('canvas'); c.width = SW * S; c.height = SH * S;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(view, 0, 0, c.width, c.height);
+    x.font = `600 ${11 * S}px "Pixelify Sans", sans-serif`; x.textAlign = 'center';
+    const w = x.measureText(state.name).width + 14 * S; x.fillStyle = 'rgba(20,16,30,.8)'; x.fillRect(SW * S / 2 - w / 2, 187 * S, w, 14 * S);
+    x.fillStyle = '#fff'; x.fillText(state.name, SW * S / 2, 198 * S);
+    const img = document.createElement('img'); img.alt = `${state.name} snapshot`;
+    img.src = c.toDataURL('image/png');
+    const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Right-click or long-press the picture to save it.';
+    dialog('Snapshot', [img, p]);
+  };
+  function encode(s) { return btoa(unescape(encodeURIComponent(JSON.stringify({ n: s.name, k: s.skin, e: s.eyes, j: s.job, q: Object.fromEntries(Object.entries(s.equip).map(([c, v]) => [c, [v.id, v.color]])) })))); }
+  function decode(code) {
+    const o = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    const equip = {}; for (const [c, [id, color]] of Object.entries(o.q || {})) if (ITEM_BY_ID[id] && CATS.includes(c)) equip[c] = { id, color: color || null };
+    return { name: String(o.n || 'Pixie').slice(0, 14), skin: +o.k % SKIN_TONES.length || 0, eyes: +o.e % EYE_COLORS.length || 0, job: String(o.j || 'Adventurer').slice(0, 20), equip };
+  }
+  $('share').onclick = () => {
+    const ta = document.createElement('textarea'); ta.id = 'codebox'; ta.value = encode(state); ta.setAttribute('aria-label', 'Outfit code');
+    const r = document.createElement('div'); r.className = 'row';
+    const cp = document.createElement('button'); cp.className = 'btn go'; cp.textContent = 'Copy code';
+    cp.onclick = () => { navigator.clipboard.writeText(ta.value).then(() => toast('Code copied'), () => { ta.select(); toast('Press Ctrl+C to copy'); }); };
+    const ld = document.createElement('button'); ld.className = 'btn'; ld.textContent = 'Wear pasted code';
+    ld.onclick = () => { try { state = decode(ta.value); $('name').value = state.name; changed(); $('dlgclose').click(); toast('Outfit loaded'); } catch (e) { toast('That code could not be read. Paste the full code and try again.'); } };
+    r.append(cp, ld);
+    const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Share this code with a friend, or paste theirs here and press Wear.';
+    dialog('Outfit code', [ta, r, p]);
+  };
+  let toastT; function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 1800); }
+
+  function save() { store.set('cur', { state, sceneIdx }); }
+
+  // ---------- boot ----------
+  function start(data) {
+    const saved = (data && data.state) ? data : store.get('cur');
+    if (saved && saved.state && saved.state.equip) { state = saved.state; sceneIdx = saved.sceneIdx || 0; }
+    for (const c of Object.keys(state.equip)) if (!ITEM_BY_ID[state.equip[c]?.id]) delete state.equip[c];
+    if (data && data.tab) tab = data.tab; if (data && data.dir) dir = data.dir;
+    $('name').value = state.name; $('map').value = sceneIdx; $('mapname').textContent = SCENES[sceneIdx].name; $('viewlbl').textContent = DIRS[dir].label;
+    refreshTags(); buildGrid(); buildSlots();
+    requestAnimationFrame(frame);
+  }
+  window.claude?.hot?.snapshot?.(() => ({ state, sceneIdx, tab, dir }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
